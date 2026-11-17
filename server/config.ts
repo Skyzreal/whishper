@@ -27,12 +27,12 @@ export function findMember(members: string[], name: unknown): string | undefined
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const members = (env['FAMILY_MEMBERS'] ?? '')
-    .split(',')
+    .split(/[,;]/)
     .map((m) => m.normalize('NFC').trim())
     .filter(Boolean);
   const managed: Record<string, string> = {};
   const managedProblems: string[] = [];
-  for (const entry of (env['MANAGED_MEMBERS'] ?? '').split(',').map((e) => e.trim()).filter(Boolean)) {
+  for (const entry of (env['MANAGED_MEMBERS'] ?? '').split(/[,;]/).map((e) => e.trim()).filter(Boolean)) {
     const [childRaw, guardianRaw, ...extra] = entry.split(':');
     const child = findMember(members, childRaw);
     const guardian = findMember(members, guardianRaw);

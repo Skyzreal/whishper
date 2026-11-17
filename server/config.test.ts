@@ -26,6 +26,12 @@ describe('config names', () => {
     expect(loadConfig({ ...base, FAMILY_MEMBERS: names }).members).toHaveLength(9);
   });
 
+  it('ignores stray semicolons at the end of values', () => {
+    const cfg = loadConfig({ ...base, FAMILY_MEMBERS: 'Marie,Orélie,François;', MANAGED_MEMBERS: 'Orélie:François;' });
+    expect(cfg.members).toEqual(['Marie', 'Orélie', 'François']);
+    expect(cfg.managed).toEqual({ Orélie: 'François' });
+  });
+
   it('parses MANAGED_MEMBERS and rejects bad entries', () => {
     const FAMILY_MEMBERS = 'Marie,François,Orélie';
     expect(loadConfig({ ...base, FAMILY_MEMBERS, MANAGED_MEMBERS: 'orelie:Francois' }).managed).toEqual({ Orélie: 'François' });
