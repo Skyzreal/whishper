@@ -1,0 +1,132 @@
+import type { Client } from '@libsql/client';
+
+/** What an owner sees about their own item. Deliberately has no claim-related fields. */
+export interface OwnItem {
+  id: number;
+  owner: string;
+  title: string;
+  url: string | null;
+  image: string | null;
+  price: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
+/** What someone else sees. The claimer's identity is never exposed, only whether it is them. */
+export interface OtherItem extends OwnItem {
+  claimed: boolean;
+  claimedByMe: boolean;
+}
+
+export interface ItemInput {
+  title: string;
+  url?: string | null;
+  image?: string | null;
+  price?: string | null;
+  note?: string | null;
+}
+
+export class HttpError extends Error {
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+function toOwnItem(row: Record<string, unknown>): OwnItem {
+  return {
+    id: Number(row['id']),
+    owner: String(row['owner']),
+    title: String(row['title']),
+    url: (row['url'] as string | null) ?? null,
+    image: (row['image'] as string | null) ?? null,
+    price: (row['price'] as string | null) ?? null,
+    note: (row['note'] as string | null) ?? null,
+    createdAt: String(row['created_at']),
+  };
+}
+
+/**
+ * THE privacy boundary. When the viewer is the owner this reads only the `items`
+ * table and returns objects without any claim fields. Everyone else gets a
+ * `claimed` flag and `claimedByMe`, never the claimer's name.
+ */
+export async function getListForViewer(
+  db: Client,
+  viewer: string,
+  owner: string,
+): Promise<OwnItem[] | OtherItem[]> {
+  if (viewer === owner) {
+    const res = await db.execute({
+      sql: 'SELECT id, owner, title, url, image, price, note, created_at FROM items WHERE owner = ? ORDER BY id DESC',
+      args: [owner],
+    });
+    return res.rows.map((r) => toOwnItem(r as unknown as Record<string, unknown>));
+  }
+
+  const res = await db.execute({
+    sql: `SELECT i.id, i.owner, i.title, i.url, i.image, i.price, i.note, i.created_at, c.claimer AS claimer
+          FROM items i LEFT JOIN claims c ON c.item_id = i.id
+          WHERE i.owner = ? ORDER BY i.id DESC`,
+    args: [owner],
+  });
+  return res.rows.map((r) => {
+    const row = r as unknown as Record<string, unknown>;
+    const claimer = (row['claimer'] as string | null) ?? null;
+    return { ...toOwnItem(row), claimed: claimer !== null, claimedByMe: claimer === viewer };
+  });
+}
+
+export async function countItemsByOwner(db: Client): Promise<Map<string, number>> {
+  const res = await db.execute('SELECT owner, COUNT(*) AS n FROM items GROUP BY owner');
+  return new Map(res.rows.map((r) => [String(r['owner']), Number(r['n'])]));
+}
+
+export async function addItem(db: Client, owner: string, input: ItemInput): Promise<OwnItem> {
+  const res = await db.execute({
+    sql: `INSERT INTO items (owner, title, url, image, price, note) VALUES (?, ?, ?, ?, ?, ?)
+          RETURNING id, owner, title, url, image, price, note, created_at`,
+    args: [owner, input.title, input.url ?? null, input.image ?? null, input.price ?? null, input.note ?? null],
+  });
+  return toOwnItem(res.rows[0] as unknown as Record<string, unknown>);
+}
+
+export async function deleteOwnItem(db: Client, owner: string, itemId: number): Promise<boolean> {
+  const tx = await db.transaction('write');
+  try {
+    const found = await tx.execute({ sql: 'SELECT id FROM items WHERE id = ? AND owner = ?', args: [itemId, owner] });
+    if (!found.rows.length) {
+      await tx.rollback();
+      return false;
+    }
+    // Remove claims explicitly (foreign keys may be off); the owner is never told they existed.
+    await tx.execute({ sql: 'DELETE FROM claims WHERE item_id = ?', args: [itemId] });
+    await tx.execute({ sql: 'DELETE FROM items WHERE id = ?', args: [itemId] });
+    await tx.commit();
+    return true;
+  } finally {
+    tx.close();
+  }
+}
+
+export async function claimItem(db: Client, viewer: string, itemId: number): Promise<void> {
+  const item = await db.execute({ sql: 'SELECT owner FROM items WHERE id = ?', args: [itemId] });
+  if (!item.rows.length) throw new HttpError(404, 'Item not found');
+  if (item.rows[0]['owner'] === viewer) throw new HttpError(403, 'You cannot reserve items on your own list');
+
+  const ins = await db.execute({
+    sql: 'INSERT OR IGNORE INTO claims (item_id, claimer) VALUES (?, ?)',
+    args: [itemId, viewer],
+  });
+  if (ins.rowsAffected === 0) {
+    const existing = await db.execute({ sql: 'SELECT claimer FROM claims WHERE item_id = ?', args: [itemId] });
+    if (existing.rows[0]?.['claimer'] !== viewer) throw new HttpError(409, 'Someone else already took this one');
+  }
+}
+
+/** Only ever removes the viewer's own claim; succeeds silently otherwise so nothing can be probed. */
+export async function unclaimItem(db: Client, viewer: string, itemId: number): Promise<void> {
+  await db.execute({ sql: 'DELETE FROM claims WHERE item_id = ? AND claimer = ?', args: [itemId, viewer] });
+}

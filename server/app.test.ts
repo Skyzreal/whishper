@@ -1,0 +1,222 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import type { Client } from '@libsql/client';
+import request from 'supertest';
+import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { createApp } from './app';
+import type { Config } from './config';
+import { openDb } from './db';
+
+const config: Config = {
+  members: ['Alice', 'Bob', 'Carol'],
+  passcode: 'family-secret',
+  sessionSecret: 'test-secret-test-secret',
+  databaseUrl: '',
+  secureCookies: false,
+};
+
+const dir = mkdtempSync(join(tmpdir(), 'whishper-'));
+const opened: Client[] = [];
+let n = 0;
+let db: Client;
+let app: ReturnType<typeof createApp>;
+
+beforeEach(async () => {
+  db = await openDb(`file:${join(dir, `t${n++}.db`)}`);
+  opened.push(db);
+  app = createApp({
+    config,
+    getDb: async () => db,
+    fetchPreview: async (url) => ({ title: 'Preview', image: null, price: null, url }),
+  });
+});
+
+afterAll(() => {
+  for (const c of opened) c.close();
+  try {
+    rmSync(dir, { recursive: true, force: true });
+  } catch {
+    /* temp files may be briefly locked on Windows; the OS cleans the temp dir */
+  }
+});
+
+async function login(name: string): Promise<string> {
+  const res = await request(app).post('/api/login').send({ name, passcode: config.passcode });
+  expect(res.status).toBe(200);
+  return (res.headers['set-cookie'] as unknown as string[])[0].split(';')[0];
+}
+
+const as = (cookie: string) => ({
+  get: (url: string) => request(app).get(url).set('Cookie', cookie),
+  post: (url: string) => request(app).post(url).set('Cookie', cookie),
+  delete: (url: string) => request(app).delete(url).set('Cookie', cookie),
+});
+
+async function aliceWithClaimedItem() {
+  const alice = as(await login('Alice'));
+  const bob = as(await login('Bob'));
+  const created = await alice.post('/api/items').send({ title: 'Cozy socks', url: 'https://example.com/socks' });
+  const id = created.body.item.id as number;
+  expect((await bob.post(`/api/items/${id}/claim`)).status).toBe(200);
+  return { alice, bob, carol: as(await login('Carol')), id };
+}
+
+describe('privacy: the owner never receives claim data', () => {
+  it('own list responses contain no claim information, even when items are claimed', async () => {
+    const { alice, id } = await aliceWithClaimedItem();
+
+    for (const url of ['/api/items', '/api/people/Alice/items', '/api/people/alice/items']) {
+      const res = await alice.get(url);
+      expect(res.status).toBe(200);
+      expect(res.body.items).toHaveLength(1);
+      expect(res.body.items[0].id).toBe(id);
+      const raw = JSON.stringify(res.body).toLowerCase();
+      expect(raw).not.toContain('claim');
+      expect(raw).not.toContain('bob');
+      expect(Object.keys(res.body.items[0]).sort()).toEqual(
+        ['createdAt', 'id', 'image', 'note', 'owner', 'price', 'title', 'url'].sort(),
+      );
+    }
+  });
+
+  it('the people overview is unchanged by claims and exposes no claim information', async () => {
+    const alice = as(await login('Alice'));
+    const bob = as(await login('Bob'));
+    const { body } = await alice.post('/api/items').send({ title: 'Book' });
+    const before = (await alice.get('/api/people')).body;
+    await bob.post(`/api/items/${body.item.id}/claim`);
+    const after = (await alice.get('/api/people')).body;
+    expect(after).toEqual(before);
+    expect(JSON.stringify(after).toLowerCase()).not.toContain('claim');
+  });
+
+  it('an item looks identical to the owner before and after being claimed or unclaimed', async () => {
+    const alice = as(await login('Alice'));
+    const bob = as(await login('Bob'));
+    const { body } = await alice.post('/api/items').send({ title: 'Book' });
+    const before = (await alice.get('/api/items')).body;
+    await bob.post(`/api/items/${body.item.id}/claim`);
+    expect((await alice.get('/api/items')).body).toEqual(before);
+    await bob.delete(`/api/items/${body.item.id}/claim`);
+    expect((await alice.get('/api/items')).body).toEqual(before);
+  });
+
+  it('the owner cannot learn claim state by trying to claim or unclaim', async () => {
+    const { alice, id } = await aliceWithClaimedItem();
+    const claimAttempt = await alice.post(`/api/items/${id}/claim`);
+    expect(claimAttempt.status).toBe(403);
+    const unclaim = await alice.delete(`/api/items/${id}/claim`);
+    expect(unclaim.status).toBe(200);
+    expect(JSON.stringify(unclaim.body)).toBe(JSON.stringify({ ok: true }));
+    // The claim must survive the owner's unclaim attempt.
+    const carol = as(await login('Carol'));
+    expect((await carol.get('/api/people/Alice/items')).body.items[0].claimed).toBe(true);
+  });
+
+  it('deleting a claimed item works for the owner and leaves no trace', async () => {
+    const { alice, id } = await aliceWithClaimedItem();
+    expect((await alice.delete(`/api/items/${id}`)).status).toBe(200);
+    expect((await db.execute('SELECT COUNT(*) AS n FROM claims')).rows[0]['n']).toBe(0);
+  });
+});
+
+describe('claiming by other family members', () => {
+  it('shows others that an item is taken without saying by whom', async () => {
+    const { bob, carol } = await aliceWithClaimedItem();
+
+    const forCarol = (await carol.get('/api/people/Alice/items')).body.items[0];
+    expect(forCarol.claimed).toBe(true);
+    expect(forCarol.claimedByMe).toBe(false);
+    expect(JSON.stringify(forCarol)).not.toContain('Bob');
+
+    const forBob = (await bob.get('/api/people/Alice/items')).body.items[0];
+    expect(forBob.claimed).toBe(true);
+    expect(forBob.claimedByMe).toBe(true);
+    expect(JSON.stringify(forBob)).not.toContain('Bob');
+  });
+
+  it('rejects a second claimer, and only the claimer can undo a claim', async () => {
+    const { alice, bob, carol, id } = await aliceWithClaimedItem();
+    expect((await carol.post(`/api/items/${id}/claim`)).status).toBe(409);
+
+    await carol.delete(`/api/items/${id}/claim`);
+    expect((await carol.get('/api/people/Alice/items')).body.items[0].claimed).toBe(true);
+
+    expect((await bob.post(`/api/items/${id}/claim`)).status).toBe(200); // idempotent
+    await bob.delete(`/api/items/${id}/claim`);
+    const after = (await carol.get('/api/people/Alice/items')).body.items[0];
+    expect(after.claimed).toBe(false);
+    expect((await carol.post(`/api/items/${id}/claim`)).status).toBe(200);
+    expect(alice).toBeDefined();
+  });
+
+  it('404s when claiming an item that does not exist', async () => {
+    const bob = as(await login('Bob'));
+    expect((await bob.post('/api/items/999/claim')).status).toBe(404);
+  });
+});
+
+describe('items', () => {
+  it('lets people add link and free-text items, and only delete their own', async () => {
+    const alice = as(await login('Alice'));
+    const bob = as(await login('Bob'));
+    const link = await alice.post('/api/items').send({ title: 'Lamp', url: 'https://shop.example/lamp', price: '$40' });
+    const text = await alice.post('/api/items').send({ title: 'Gift card', note: 'Any store, ~$50' });
+    expect(link.status).toBe(201);
+    expect(text.status).toBe(201);
+    expect(text.body.item.url).toBeNull();
+
+    expect((await bob.delete(`/api/items/${link.body.item.id}`)).status).toBe(404);
+    expect((await alice.get('/api/items')).body.items).toHaveLength(2);
+  });
+
+  it('validates input', async () => {
+    const alice = as(await login('Alice'));
+    expect((await alice.post('/api/items').send({})).status).toBe(400);
+    expect((await alice.post('/api/items').send({ title: 'x', url: 'javascript:alert(1)' })).status).toBe(400);
+    expect((await alice.post('/api/items').send({ title: 'x', image: 'data:text/html,hi' })).status).toBe(400);
+    expect((await alice.post('/api/items').send({ title: 'x'.repeat(201) })).status).toBe(400);
+  });
+});
+
+describe('auth', () => {
+  it('requires a valid session for everything but login and the name list', async () => {
+    for (const path of ['/api/me', '/api/items', '/api/people', '/api/people/Alice/items']) {
+      expect((await request(app).get(path)).status).toBe(401);
+    }
+    expect((await request(app).get('/api/members')).body.members).toEqual(config.members);
+  });
+
+  it('rejects wrong passcodes and unknown names with the same response', async () => {
+    const wrongPass = await request(app).post('/api/login').send({ name: 'Alice', passcode: 'nope' });
+    const wrongName = await request(app).post('/api/login').send({ name: 'Mallory', passcode: config.passcode });
+    expect(wrongPass.status).toBe(401);
+    expect(wrongName.status).toBe(401);
+    expect(wrongPass.body).toEqual(wrongName.body);
+  });
+
+  it('rejects tampered or forged session cookies', async () => {
+    const cookie = await login('Alice');
+    const [name, token] = cookie.split('=');
+    const [payload, sig] = token.split('.');
+    const forgedPayload = Buffer.from(JSON.stringify({ u: 'Bob', exp: Date.now() + 1e9 })).toString('base64url');
+    expect((await request(app).get('/api/me').set('Cookie', `${name}=${forgedPayload}.${sig}`)).status).toBe(401);
+    expect((await request(app).get('/api/me').set('Cookie', `${name}=${payload}.bad`)).status).toBe(401);
+    expect((await request(app).get('/api/me').set('Cookie', cookie)).body.name).toBe('Alice');
+  });
+
+  it('sets an HttpOnly cookie and clears it on logout', async () => {
+    const res = await request(app).post('/api/login').send({ name: 'alice', passcode: config.passcode });
+    expect(res.body.name).toBe('Alice');
+    expect(String(res.headers['set-cookie'])).toMatch(/HttpOnly/);
+    const out = await request(app).post('/api/logout');
+    expect(String(out.headers['set-cookie'])).toMatch(/Max-Age=0/);
+  });
+
+  it('blocks cross-site writes', async () => {
+    const alice = as(await login('Alice'));
+    const res = await alice.post('/api/items').set('Origin', 'https://evil.example').send({ title: 'x' });
+    expect(res.status).toBe(403);
+  });
+});
