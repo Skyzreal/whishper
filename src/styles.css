@@ -244,11 +244,25 @@ label.check input { width: auto; margin: 0; }
   .tab span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tab svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   .tab.active svg { fill: currentColor; fill-opacity: 0.15; }
-  .tab-add {
+  .tab-add, .tab-add:hover:not(:disabled) {
     display: grid; place-items: center; position: fixed; z-index: 21;
-    right: 1rem; bottom: calc(4.5rem + env(safe-area-inset-bottom));
-    width: 52px; height: 52px; min-height: 52px; padding: 0; border-radius: 50%;
-    font-size: 1.9rem; line-height: 1; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+    right: 1.25rem; bottom: calc(6.4rem + env(safe-area-inset-bottom));
+    width: 56px; height: 56px; min-height: 56px; padding: 0; border-radius: 50%;
+    border: 0; color: #fff;
+    background: radial-gradient(circle at 32% 26%, #f0757b 0%, var(--red) 48%, var(--red-dark) 100%);
+    box-shadow: inset 0 -4px 8px rgba(0, 0, 0, 0.25), 0 6px 14px rgba(0, 0, 0, 0.28);
+  }
+  .tab-add:active { transform: scale(0.95); }
+  .tab-add svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; }
+  /* capuchon doré + anneau d'accroche */
+  .tab-add::before {
+    content: ''; position: absolute; top: -8px; left: 50%; transform: translateX(-50%);
+    width: 18px; height: 11px; border-radius: 3px 3px 2px 2px;
+    background: linear-gradient(90deg, #a98128, var(--gold) 45%, #f1d98e 60%, #a98128);
+  }
+  .tab-add::after {
+    content: ''; position: absolute; top: -17px; left: 50%; transform: translateX(-50%);
+    width: 10px; height: 10px; border: 2px solid var(--gold); border-radius: 50%; box-sizing: border-box;
   }
 
   .me button.link.logout {
