@@ -38,6 +38,11 @@ Côté technique : s'il y a une réservation, deleteOwnItem ne supprime pas la l
 > Remarque : la personne qui a accès au tableau de bord de l'hébergement ou à la base de données peut évidemment lire la table `claims`.
 > La règle de confidentialité protège les membres de la famille qui utilisent l'application, pas la personne qui l'administre.
 
+### Gérer la liste d'un enfant
+
+Avec `MANAGED_MEMBERS=Orélie:François`, Orélie n'a pas de compte : François va sur sa fiche dans **Famille** et peut y **ajouter** et **retirer** des idées à sa place. Le prénom d'Orélie n'apparaît plus sur la page de connexion, et la connexion à son nom est refusée.
+Le parent voit la liste comme le ferait son propriétaire : aucune information sur les réservations, et il ne peut pas réserver sur cette liste. Les autres membres de la famille la voient et réservent normalement. Pour que l'enfant ait son propre compte plus tard, retire simplement son entrée de `MANAGED_MEMBERS`.
+
 ## Technologies
 
 - **Interface :** [Angular](https://angular.dev) (composants autonomes, signaux, sans zone), application monopage statique.
@@ -69,6 +74,7 @@ La base de données locale est créée dans `data/whishper.db`.
 | Variable | Requise | Description |
 | --- | --- | --- |
 | `FAMILY_MEMBERS` | oui | Prénoms séparés par des virgules, au moins deux (p. ex. `Stéphanie,Michaël,Jade`). Les accents et les majuscules sont ignorés à la connexion. Renommer quelqu'un rend ses cadeaux existants orphelins. |
+| `MANAGED_MEMBERS` | non | Personnes sans compte (un enfant, par exemple), au format `Enfant:Parent` (p. ex. `Orélie:François`). Les deux doivent être dans `FAMILY_MEMBERS`. Voir « Gérer la liste d'un enfant ». |
 | `FAMILY_PASSCODE` | oui | Code secret de la famille, demandé une seule fois par personne pour créer son mot de passe. Il ne sert plus à se connecter ensuite. |
 | `SESSION_SECRET` | oui | Chaîne aléatoire (16 caractères ou plus) servant à signer les cookies. La changer déconnecte tout le monde. |
 | `TURSO_DATABASE_URL` | production | p. ex. `libsql://your-db-org.turso.io`. Par défaut, le fichier local `file:data/whishper.db`. |
@@ -105,7 +111,7 @@ La base de données locale est créée dans `data/whishper.db`.
 2. **Importe le dépôt** dans [Vercel](https://vercel.com/new). [`vercel.json`](vercel.json) configure déjà la commande de build,
    le dossier de sortie et le routage. Vercel détecte `api/index.ts` comme fonction serverless.
 3. **Ajoute les variables d'environnement** dans *Project → Settings → Environment Variables* :
-   `FAMILY_MEMBERS`, `FAMILY_PASSCODE`, `SESSION_SECRET`, `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`.
+   `FAMILY_MEMBERS`, `MANAGED_MEMBERS` (optionnel), `FAMILY_PASSCODE`, `SESSION_SECRET`, `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`.
 4. **Déploie.** Partage l'adresse et le code secret avec ta famille : chacun crée son mot de passe à sa première visite. 🎉
 
 > Le système de fichiers de Vercel est en lecture seule et éphémère : tu dois donc utiliser Turso (pas le fichier SQLite local) en production.

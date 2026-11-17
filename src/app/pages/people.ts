@@ -22,7 +22,7 @@ import { Person } from '../models';
         <a class="person" [routerLink]="p.name === me() ? '/' : ['/people', p.name]">
           <app-avatar [name]="p.name" [size]="56" />
           <strong>{{ p.name }}{{ p.name === me() ? ' (toi)' : '' }}</strong>
-          <span>{{ p.itemCount }} {{ p.itemCount > 1 ? 'idées' : 'idée' }}</span>
+          <span>{{ p.itemCount }} {{ p.itemCount > 1 ? 'idées' : 'idée' }}{{ p.canManage ? ' · tu gères sa liste' : '' }}</span>
         </a>
       }
     </div>

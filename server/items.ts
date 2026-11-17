@@ -93,10 +93,14 @@ export async function addItem(db: Client, owner: string, input: ItemInput): Prom
   return toOwnItem(res.rows[0] as unknown as Record<string, unknown>);
 }
 
-export async function deleteOwnItem(db: Client, owner: string, itemId: number): Promise<boolean> {
+/** `owners` is the viewer plus anyone whose list they manage; all of them get the owner view. */
+export async function deleteOwnItem(db: Client, owners: string[], itemId: number): Promise<boolean> {
   const tx = await db.transaction('write');
   try {
-    const found = await tx.execute({ sql: 'SELECT id FROM items WHERE id = ? AND owner = ? AND deleted_at IS NULL', args: [itemId, owner] });
+    const found = await tx.execute({
+      sql: `SELECT id FROM items WHERE id = ? AND owner IN (${owners.map(() => '?').join(',')}) AND deleted_at IS NULL`,
+      args: [itemId, ...owners],
+    });
     if (!found.rows.length) {
       await tx.rollback();
       return false;
@@ -118,10 +122,13 @@ export async function deleteOwnItem(db: Client, owner: string, itemId: number): 
   }
 }
 
-export async function claimItem(db: Client, viewer: string, itemId: number): Promise<void> {
+export async function claimItem(db: Client, viewer: string, itemId: number, managedByViewer: string[] = []): Promise<void> {
   const item = await db.execute({ sql: 'SELECT owner FROM items WHERE id = ? AND deleted_at IS NULL', args: [itemId] });
   if (!item.rows.length) throw new HttpError(404, 'Cadeau introuvable');
-  if (item.rows[0]['owner'] === viewer) throw new HttpError(403, 'Tu ne peux pas réserver un cadeau de ta propre liste');
+  const owner = String(item.rows[0]['owner']);
+  if (owner === viewer) throw new HttpError(403, 'Tu ne peux pas réserver un cadeau de ta propre liste');
+  // A manager gets the owner view of the list, so they must not be able to claim (and thereby see claims).
+  if (managedByViewer.includes(owner)) throw new HttpError(403, 'Tu gères cette liste : tu ne peux pas y réserver de cadeau');
 
   const ins = await db.execute({
     sql: 'INSERT OR IGNORE INTO claims (item_id, claimer) VALUES (?, ?)',

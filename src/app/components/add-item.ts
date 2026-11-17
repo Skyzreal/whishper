@@ -1,4 +1,4 @@
-import { Component, model, output, signal } from '@angular/core';
+import { Component, input, model, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { inject } from '@angular/core';
 import { Api, errorMessage } from '../api';
@@ -8,7 +8,7 @@ import { Api, errorMessage } from '../api';
   imports: [FormsModule],
   template: `
     @if (!open()) {
-      <button type="button" class="add-toggle" (click)="open.set(true)">Ajouter à ma liste</button>
+      <button type="button" class="add-toggle" (click)="open.set(true)">{{ forName() ? 'Ajouter pour ' + forName() : 'Ajouter à ma liste' }}</button>
     } @else {
     <form class="panel add" (ngSubmit)="submit()" #f="ngForm">
       <div class="panel-head">
@@ -59,6 +59,8 @@ export class AddItem {
   private api = inject(Api);
   added = output<void>();
   open = model(false);
+  /** Set when adding to the list of someone you manage. */
+  forName = input('');
 
   url = signal('');
   title = signal('');
@@ -110,6 +112,7 @@ export class AddItem {
         image: this.image() || undefined,
         price: this.price().trim() || undefined,
         note: this.note().trim() || undefined,
+        forName: this.forName() || undefined,
       });
       for (const s of [this.url, this.title, this.price, this.note, this.image, this.hint]) s.set('');
       this.fetchedFor = '';

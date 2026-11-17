@@ -17,6 +17,8 @@ export interface Item {
 export interface Person {
   name: string;
   itemCount: number;
+  /** True when you manage this person's list (they have no account of their own). */
+  canManage?: boolean;
 }
 
 export interface Preview {
@@ -34,10 +36,13 @@ export interface NewItem {
   image?: string;
   price?: string;
   note?: string;
+  /** Add to the list of someone whose list you manage, instead of your own. */
+  forName?: string;
 }
 
 export interface PersonList {
   owner: string;
   isMe: boolean;
+  canManage?: boolean;
   items: Item[];
 }

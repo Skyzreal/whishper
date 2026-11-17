@@ -9,7 +9,8 @@ import type { Config } from './config';
 import { openDb } from './db';
 
 const config: Config = {
-  members: ['Stéphanie', 'Michaël', 'Nathaniel'],
+  members: ['Stéphanie', 'Michaël', 'Nathaniel', 'Orélie'],
+  managed: { Orélie: 'Michaël' },
   passcode: 'family-secret',
   sessionSecret: 'test-secret-test-secret',
   databaseUrl: '',
@@ -269,7 +270,7 @@ describe('auth', () => {
     for (const path of ['/api/me', '/api/items', '/api/people', '/api/people/St%C3%A9phanie/items']) {
       expect((await request(app).get(path)).status).toBe(401);
     }
-    expect((await request(app).get('/api/members')).body.members).toEqual(config.members);
+    expect((await request(app).get('/api/members')).body.members).toEqual(['Stéphanie', 'Michaël', 'Nathaniel']);
   });
 
   it('rejects wrong passwords and unknown names with the same response', async () => {
@@ -319,7 +320,7 @@ describe('auth', () => {
   it('lists who already has a password so the sign-in form can adapt', async () => {
     await login('Stéphanie');
     const body = (await request(app).get('/api/members')).body;
-    expect(body.members).toEqual(config.members);
+    expect(body.members).toEqual(['Stéphanie', 'Michaël', 'Nathaniel']);
     expect(body.registered).toEqual(['Stéphanie']);
   });
 
@@ -372,5 +373,44 @@ describe('auth', () => {
     const alice = as(await login('Stéphanie'));
     const res = await alice.post('/api/items').set('Origin', 'https://evil.example').send({ title: 'x' });
     expect(res.status).toBe(403);
+  });
+});
+
+describe('managed lists (a child without an account)', () => {
+  it('the manager adds and removes items for the child, and sees the list without claim data', async () => {
+    const bob = as(await login('Michaël'));
+    const alice = as(await login('Stéphanie'));
+    const created = await bob.post('/api/items').send({ title: 'Lego', forName: 'orelie' });
+    expect(created.status).toBe(201);
+    expect(created.body.item.owner).toBe('Orélie');
+    const id = created.body.item.id as number;
+
+    expect((await alice.post(`/api/items/${id}/claim`)).status).toBe(200);
+    const asManager = await bob.get('/api/people/Or%C3%A9lie/items');
+    expect(asManager.body.canManage).toBe(true);
+    expect(JSON.stringify(asManager.body)).not.toMatch(/claim/i);
+    expect((await alice.get('/api/people/Or%C3%A9lie/items')).body.items[0].claimed).toBe(true);
+
+    expect((await bob.delete(`/api/items/${id}`)).status).toBe(200);
+    expect((await alice.get('/api/reservations')).body.items[0].removed).toBe(true);
+  });
+
+  it('the manager cannot claim on the managed list; others cannot manage it', async () => {
+    const bob = as(await login('Michaël'));
+    const alice = as(await login('Stéphanie'));
+    const { body } = await bob.post('/api/items').send({ title: 'Lego', forName: 'Orélie' });
+    expect((await bob.post(`/api/items/${body.item.id}/claim`)).status).toBe(403);
+    expect((await alice.post('/api/items').send({ title: 'Hack', forName: 'Orélie' })).status).toBe(403);
+    expect((await alice.delete(`/api/items/${body.item.id}`)).status).toBe(404);
+    expect((await alice.get('/api/people/Or%C3%A9lie/items')).body.canManage).toBe(false);
+    expect((await alice.get('/api/people')).body.people.every((p: { canManage: boolean }) => !p.canManage)).toBe(true);
+  });
+
+  it('the managed person cannot sign in or register, and is not offered on the sign-in page', async () => {
+    const reg = await request(app).post('/api/register').send({ name: 'Orélie', passcode: config.passcode, password: PASSWORD });
+    expect(reg.status).toBe(403);
+    const log = await request(app).post('/api/login').send({ name: 'Orélie', password: PASSWORD });
+    expect(log.status).toBe(403);
+    expect((await request(app).get('/api/members')).body.members).not.toContain('Orélie');
   });
 });

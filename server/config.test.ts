@@ -25,4 +25,13 @@ describe('config names', () => {
     const names = 'Stéphanie,Michaël,Nathaniel,Jade,Marie,Stéphane,Orélie,François,Mélanie';
     expect(loadConfig({ ...base, FAMILY_MEMBERS: names }).members).toHaveLength(9);
   });
+
+  it('parses MANAGED_MEMBERS and rejects bad entries', () => {
+    const FAMILY_MEMBERS = 'Marie,François,Orélie';
+    expect(loadConfig({ ...base, FAMILY_MEMBERS, MANAGED_MEMBERS: 'orelie:Francois' }).managed).toEqual({ Orélie: 'François' });
+    expect(loadConfig({ ...base, FAMILY_MEMBERS }).managed).toEqual({});
+    expect(() => loadConfig({ ...base, FAMILY_MEMBERS, MANAGED_MEMBERS: 'Zoé:François' })).toThrow(/MANAGED_MEMBERS/);
+    expect(() => loadConfig({ ...base, FAMILY_MEMBERS, MANAGED_MEMBERS: 'Orélie:Orélie' })).toThrow(/MANAGED_MEMBERS/);
+    expect(() => loadConfig({ ...base, FAMILY_MEMBERS, MANAGED_MEMBERS: 'Orélie:François,François:Marie' })).toThrow(/gérée/);
+  });
 });
