@@ -265,15 +265,14 @@ label.check input { width: auto; margin: 0; }
     width: 10px; height: 10px; border: 2px solid var(--gold); border-radius: 50%; box-sizing: border-box;
   }
 
-  .me button.link.logout {
-    display: inline-flex; align-items: center; gap: 0.4rem; min-height: 36px;
-    padding: 0.3rem 0.8rem; border: 1px solid var(--line-strong); border-radius: 999px;
-    color: var(--ink); font-size: 0.9rem; text-decoration: none; background: var(--paper);
-  }
-  .me button.link.logout:hover:not(:disabled) { background: #fff; }
 }
-.logout svg { display: none; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-@media (max-width: 640px) { .logout svg { display: block; } }
+.me button.link.logout {
+  display: inline-flex; align-items: center; gap: 0.4rem; min-height: 36px;
+  padding: 0.3rem 0.8rem; border: 1px solid var(--line-strong); border-radius: 999px;
+  color: var(--ink); font-size: 0.9rem; text-decoration: none; background: var(--paper);
+}
+.me button.link.logout:hover:not(:disabled) { background: #fff; border-color: var(--ink); }
+.logout svg { display: block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ===== Décor de Noël (supprime ce bloc pour retirer le décor ; les couleurs sont dans :root) ===== */
 .topbar { border-bottom: 0; padding-bottom: 0.9rem; }
