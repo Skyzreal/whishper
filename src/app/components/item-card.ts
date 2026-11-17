@@ -10,7 +10,7 @@ import { Item } from '../models';
         @if (i.image) {
           <img [src]="i.image" alt="" loading="lazy" referrerpolicy="no-referrer" />
         } @else {
-          <span class="placeholder">{{ i.url ? '🔗' : '🎁' }}</span>
+          <span class="placeholder" aria-hidden="true">{{ initial() }}</span>
         }
       </div>
       <div class="body">
@@ -27,21 +27,21 @@ import { Item } from '../models';
       </div>
       <div class="actions">
         @if (mode() === 'own') {
-          <button type="button" class="danger" (click)="remove.emit(i)"          >Retirer</button>
+          <button type="button" class="danger" (click)="remove.emit(i)">Retirer</button>
         } @else if (mode() === 'reservation') {
           @if (i.removed) {
             <span class="badge taken">Retiré de sa liste</span>
           } @else {
-            <span class="badge mine">✓ Tu t'en occupes</span>
+            <span class="badge mine">Tu t'en occupes</span>
           }
           <button type="button" class="secondary" (click)="unclaim.emit(i)">Annuler</button>
         } @else if (i.claimedByMe) {
-                    <span class="badge mine">✓ Tu t'en occupes</span>
-                    <button type="button" class="secondary" (click)="unclaim.emit(i)">Annuler</button>
+          <span class="badge mine">Tu t'en occupes</span>
+          <button type="button" class="secondary" (click)="unclaim.emit(i)">Annuler</button>
         } @else if (i.claimed) {
-                    <span class="badge taken">Déjà réservé</span>
+          <span class="badge taken">Déjà réservé</span>
         } @else {
-                    <button type="button" (click)="claim.emit(i)">Je m'en occupe</button>
+          <button type="button" (click)="claim.emit(i)">Je m'en occupe</button>
         }
       </div>
     </article>
@@ -55,6 +55,8 @@ export class ItemCard {
   claim = output<Item>();
   unclaim = output<Item>();
   remove = output<Item>();
+
+  protected initial = computed(() => Array.from(this.item().title.trim())[0]?.toLocaleUpperCase('fr') ?? '');
 
   protected host = computed(() => {
     try {

@@ -10,8 +10,8 @@ import { Auth } from '../auth';
   imports: [FormsModule],
   template: `
     <section class="panel login">
-      <h1>🎁 Whishper</h1>
-      <p class="lead">Notre liste de souhaits familiale. Choisis ton prénom pour te connecter.</p>
+      <h1>Bonjour</h1>
+      <p class="lead">Les listes de souhaits de la famille. Commence par choisir ton prénom.</p>
       <form (ngSubmit)="submit()">
         <label>
           Qui es-tu ?
@@ -24,14 +24,14 @@ import { Auth } from '../auth';
         </label>
         @if (name() && isNew()) {
           <p class="hint">
-            C'est ta première visite : entre le code secret de la famille, puis crée ton propre mot de passe.
+            Première visite ? Entre le code de la famille, puis choisis ton mot de passe.
           </p>
           <label>
-            Code secret de la famille
+            Code de la famille
             <input name="passcode" type="password" autocomplete="off" required [(ngModel)]="passcode" />
           </label>
           <label>
-            Crée ton mot de passe (6 caractères minimum)
+            Ton mot de passe <span class="hint">(6 caractères minimum)</span>
             <input name="newPassword" type="password" autocomplete="new-password" minlength="6" required [(ngModel)]="password" />
           </label>
           <label>
@@ -48,7 +48,7 @@ import { Auth } from '../auth';
           <p class="error" role="alert">{{ error() }}</p>
         }
         <button type="submit" [disabled]="!canSubmit() || busy()">
-          {{ busy() ? 'Connexion…' : isNew() ? 'Créer mon mot de passe' : 'Se connecter' }}
+          {{ busy() ? 'Connexion…' : isNew() ? 'Créer mon compte' : 'Se connecter' }}
         </button>
       </form>
     </section>  `,

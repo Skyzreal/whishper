@@ -11,7 +11,7 @@ import { Person } from '../models';
     <header class="hero">
       <div>
         <h1>Famille</h1>
-        <p>Choisis quelqu'un pour voir ce qui lui ferait plaisir.</p>
+        <p>Clique sur quelqu'un pour voir sa liste.</p>
       </div>
     </header>
     @if (error()) {
@@ -21,8 +21,8 @@ import { Person } from '../models';
       @for (p of people(); track p.name) {
         <a class="person" [routerLink]="p.name === me() ? '/' : ['/people', p.name]">
           <app-avatar [name]="p.name" [size]="56" />
-          <strong>{{ p.name }}          {{ p.name === me() ? ' (toi)' : '' }}</strong>
-                    <span>{{ p.itemCount }} {{ p.itemCount > 1 ? 'cadeaux' : 'cadeau' }}</span>
+          <strong>{{ p.name }}{{ p.name === me() ? ' (toi)' : '' }}</strong>
+          <span>{{ p.itemCount }} {{ p.itemCount > 1 ? 'idées' : 'idée' }}</span>
         </a>
       }
     </div>

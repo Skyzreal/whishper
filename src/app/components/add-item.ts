@@ -8,19 +8,19 @@ import { Api, errorMessage } from '../api';
   imports: [FormsModule],
   template: `
     @if (!open()) {
-      <button type="button" class="add-toggle" (click)="open.set(true)"><span aria-hidden="true">＋</span> Ajouter un cadeau</button>
+      <button type="button" class="add-toggle" (click)="open.set(true)">Ajouter à ma liste</button>
     } @else {
     <form class="panel add" (ngSubmit)="submit()" #f="ngForm">
       <div class="panel-head">
-        <h2>Ajoute quelque chose qui te ferait plaisir</h2>
+        <h2>Une nouvelle idée</h2>
         <button type="button" class="link" (click)="open.set(false)">Fermer</button>
       </div>
       <label>
-        Lien <span class="hint">(facultatif – colle la page d'un produit de n'importe quelle boutique)</span>
+        Lien <span class="hint">(si t'en as un)</span>
         <span class="row">
           <input name="url" type="url" inputmode="url" placeholder="https://…" [(ngModel)]="url" (paste)="onPaste()" (blur)="fetchDetails()" />
           <button type="button" class="secondary" [disabled]="!url() || fetching()" (click)="fetchDetails(true)">
-            {{ fetching() ? 'Recherche…' : 'Récupérer les infos' }}
+            {{ fetching() ? 'Je regarde…' : 'Chercher les infos' }}
           </button>
         </span>
       </label>
@@ -35,22 +35,22 @@ import { Api, errorMessage } from '../api';
       }
       <label>
         C'est quoi ?
-        <input name="title" required maxlength="200" placeholder="p. ex. Couverture douillette, ou Carte-cadeau" [(ngModel)]="title" />
+        <input name="title" required maxlength="200" placeholder="Une couverture, une carte-cadeau…" [(ngModel)]="title" />
       </label>
       <div class="row two">
         <label>
-          Prix / montant <span class="hint">(facultatif)</span>
-          <input name="price" maxlength="50" placeholder="p. ex. 40 $ ou environ 50 $" [(ngModel)]="price" />
+          Prix <span class="hint">(si tu veux)</span>
+          <input name="price" maxlength="50" placeholder="40 $, environ 50 $…" [(ngModel)]="price" />
         </label>
         <label>
-          Notes <span class="hint">(facultatif)</span>
-          <input name="note" maxlength="1000" placeholder="Taille, couleur, quel magasin…" [(ngModel)]="note" />
+          Précisions <span class="hint">(si tu veux)</span>
+          <input name="note" maxlength="1000" placeholder="Taille, couleur, magasin…" [(ngModel)]="note" />
         </label>
       </div>
       @if (error()) {
         <p class="error" role="alert">{{ error() }}</p>
       }
-      <button type="submit" [disabled]="!title().trim() || saving()">{{ saving() ? 'Ajout…' : 'Ajouter à ma liste' }}</button>
+      <button type="submit" [disabled]="!title().trim() || saving()">{{ saving() ? 'Ajout…' : 'Ajouter' }}</button>
     </form>
     }
   `,
@@ -89,7 +89,7 @@ export class AddItem {
       if (p.price && (!this.price().trim() || force)) this.price.set(p.price);
       if (p.partial) {
         this.hint.set(
-          "Impossible de récupérer tous les détails de ce lien (le site bloque peut-être la lecture automatique). Vérifie le nom et ajoute le prix ou une note toi-même.",
+          "Le site n'a pas voulu qu'on lise sa page. Vérifie le nom, puis ajoute le prix ou une précision si tu veux.",
         );
       }
     } catch (e) {

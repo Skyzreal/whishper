@@ -14,11 +14,11 @@ import { Item } from '../models';
     <header class="hero">
       <app-avatar [name]="auth.user() ?? ''" [size]="56" />
       <div>
-        <h1>Ma liste de souhaits</h1>
-        <p>Toute la famille peut la voir. Toi seul(e) peux la modifier.</p>
+        <h1>Ma liste</h1>
+        <p>Tout le monde peut la lire, mais toi seul(e) peux la changer.</p>
       </div>
     </header>
-    <p class="notice">🔒 Tu ne verras jamais quels cadeaux ont été réservés, pour que la surprise reste entière.</p>
+    <p class="notice">Tu ne verras jamais ce qui a été réservé. C'est fait exprès, pour garder la surprise.</p>
 
     <app-add-item [(open)]="adding" (added)="load()" />
 
@@ -31,7 +31,7 @@ import { Item } from '../models';
         <app-item-card [item]="item" mode="own" (remove)="remove($event)" />
       } @empty {
         @if (loaded()) {
-          <p class="empty">Rien pour l'instant. Appuie sur « Ajouter un cadeau » !</p>
+          <p class="empty">Ta liste est vide pour l'instant.</p>
         }
       }
     </div>

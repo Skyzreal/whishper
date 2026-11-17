@@ -13,8 +13,8 @@ import { Item } from '../models';
       <div class="hero-back"><a routerLink="/people" class="back">‹ Famille</a></div>
       <app-avatar [name]="owner() || name()" [size]="56" />
       <div>
-        <h1>Liste de souhaits de {{ owner() || name() }}</h1>
-        <p>Appuie sur « Je m'en occupe » pour réserver un cadeau. Les autres verront qu'il est pris, mais {{ owner() || name() }} ne le verra jamais.</p>
+        <h1>La liste de {{ owner() || name() }}</h1>
+        <p>Clique sur « Je m'en occupe » pour réserver un cadeau. Les autres verront qu'il est pris, {{ owner() || name() }} non.</p>
       </div>
     </header>
     @if (error()) {
@@ -26,7 +26,7 @@ import { Item } from '../models';
         <app-item-card [item]="item" mode="other" (claim)="claim($event)" (unclaim)="unclaim($event)" />
       } @empty {
         @if (loaded()) {
-          <p class="empty">{{ owner() }} n'a encore rien ajouté.</p>
+          <p class="empty">{{ owner() }} n'a encore rien mis dans sa liste.</p>
         }
       }
     </div>

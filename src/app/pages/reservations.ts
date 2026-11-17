@@ -12,10 +12,10 @@ import { Item } from '../models';
     <header class="hero">
       <div>
         <h1>Mes réservations</h1>
-        <p>Les cadeaux dont tu t'occupes. Toi seul(e) vois cette page.</p>
+        <p>Ce que tu as promis d'acheter. Personne d'autre ne voit cette page.</p>
       </div>
     </header>
-    <p class="notice">Si quelqu'un retire un cadeau de sa liste, il reste ici, marqué « Retiré de sa liste ». Appuie sur « Annuler » pour le faire disparaître.</p>
+    <p class="notice">Si quelqu'un enlève un cadeau de sa liste, il reste ici avec la mention « Retiré de sa liste ». « Annuler » le fait disparaître.</p>
 
     @if (error()) {
       <p class="error" role="alert">{{ error() }}</p>
@@ -35,7 +35,7 @@ import { Item } from '../models';
       </section>
     } @empty {
       @if (loaded()) {
-        <p class="empty">Tu n'as encore rien réservé.</p>
+        <p class="empty">Rien de réservé pour l'instant.</p>
       }
     }
   `,

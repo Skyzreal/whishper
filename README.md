@@ -1,4 +1,4 @@
-# 🎁 Whishper
+# Whishper
 
 Une liste de souhaits familiale et privée, pour une famille qui veut **offrir des cadeaux sans tirage au sort**
 (pas de style Pikaddo avec une personne assignée au hasard) et **sans clavardage de groupe rempli de « j'ai acheté ça »**.

@@ -12,6 +12,6 @@ export class Avatar {
   protected color = computed(() => {
     let h = 0;
     for (const ch of this.name().toLowerCase()) h = (h * 31 + ch.charCodeAt(0)) % 360;
-    return `hsl(${h} 55% 42%)`;
+    return `hsl(${h} 32% 40%)`;
   });
 }

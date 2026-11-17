@@ -9,7 +9,7 @@ import { Avatar } from './components/avatar';
   imports: [RouterOutlet, RouterLink, RouterLinkActive, Avatar],
   template: `
     <header class="topbar">
-      <a routerLink="/" class="brand">🎁 Whishper</a>
+      <a routerLink="/" class="brand">Whishper</a>
       @if (auth.user(); as me) {
         <nav class="top-nav">
           <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Ma liste</a>
@@ -35,7 +35,7 @@ import { Avatar } from './components/avatar';
           <span>Réservés</span>
         </a>
         <button type="button" class="tab-add" (click)="add()">
-          <span aria-hidden="true">＋</span> Ajouter
+          <span aria-hidden="true">+</span> Ajouter
         </button>
         <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="tab">
           <app-avatar [name]="me" [size]="26" />
