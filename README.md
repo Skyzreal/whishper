@@ -52,7 +52,7 @@ Le parent voit la liste comme le ferait son propriétaire : aucune information s
 
 - **Interface :** [Angular](https://angular.dev) (composants autonomes, signaux, sans zone), application monopage statique.
 - **API :** petite application [Express](https://expressjs.com) + TypeScript dans [`server/`](server). Sur Vercel, elle tourne comme une seule
-  fonction serverless ([`api/index.ts`](api/index.ts)) ; ailleurs, c'est un simple serveur Node.
+  fonction serverless ([`server/vercel.ts`](server/vercel.ts), empaquetée en `api/index.js` par `npm run build`) ; ailleurs, c'est un simple serveur Node.
 - **Base de données :** [libSQL](https://github.com/tursodatabase/libsql) (SQLite). Un fichier local en développement, une base
   [Turso](https://turso.tech) gratuite en production. Le schéma est créé automatiquement.
 - **Connexion :** chacun a **son propre mot de passe**. À la toute première visite, tu choisis ton prénom, tu entres le code secret de la famille (preuve que tu en fais partie) puis tu crées ton mot de passe. Ensuite, prénom + mot de passe suffisent. Les mots de passe sont stockés hachés (scrypt, avec sel) ; le code de la famille ne permet jamais de se connecter à un compte existant. Un cookie signé et `HttpOnly` te garde connecté 30 jours.
@@ -114,7 +114,9 @@ La base de données locale est créée dans `data/whishper.db`.
    turso db tokens create whishper       # -> TURSO_AUTH_TOKEN
    ```
 2. **Importe le dépôt** dans [Vercel](https://vercel.com/new). [`vercel.json`](vercel.json) configure déjà la commande de build,
-   le dossier de sortie et le routage. Vercel détecte `api/index.ts` comme fonction serverless.
+   le dossier de sortie et le routage. Vercel détecte `api/index.js` comme fonction serverless. Ce fichier est généré à partir de
+   `server/vercel.ts` par `npm run build:api` (déjà inclus dans `npm run build`) ; il est versionné, donc relance cette commande et
+   commite le résultat après avoir modifié le code du serveur.
 3. **Ajoute les variables d'environnement** dans *Project → Settings → Environment Variables* :
    `FAMILY_MEMBERS`, `MANAGED_MEMBERS` (optionnel), `FAMILY_PASSCODE`, `SESSION_SECRET`, `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`.
 4. **Déploie.** Partage l'adresse et le code secret avec ta famille : chacun crée son mot de passe à sa première visite. 🎉

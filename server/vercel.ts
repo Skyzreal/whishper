@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
-import { createApp } from '../server/app';
-import { loadConfig } from '../server/config';
-import { openDb } from '../server/db';
+import { createApp } from './app';
+import { loadConfig } from './config';
+import { openDb } from './db';
 
 type Handler = (req: Request, res: Response) => void;
 
