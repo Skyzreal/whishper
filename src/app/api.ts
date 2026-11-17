@@ -4,8 +4,12 @@ import { firstValueFrom } from 'rxjs';
 import { Item, NewItem, PersonList, Person, Preview } from './models';
 
 export function errorMessage(e: unknown): string {
-  if (e instanceof HttpErrorResponse) return e.error?.error ?? 'Une erreur est survenue. Réessaie.';
-  return 'Une erreur est survenue. Réessaie.';
+  const fallback = 'Une erreur est survenue. Réessaie.';
+  if (e instanceof HttpErrorResponse) {
+    const msg = e.error?.error;
+    return typeof msg === 'string' && msg ? msg : fallback;
+  }
+  return fallback;
 }
 
 @Injectable({ providedIn: 'root' })

@@ -121,6 +121,8 @@ La base de données locale est créée dans `data/whishper.db`.
 
 > Le système de fichiers de Vercel est en lecture seule et éphémère : tu dois donc utiliser Turso (pas le fichier SQLite local) en production.
 
+> **Erreur au démarrage sur Vercel ?** Si la page de connexion affiche une erreur ou une liste vide, la cause est presque toujours une variable d'environnement : le message affiché indique laquelle (`FAMILY_MEMBERS`, `SESSION_SECRET` d'au moins 16 caractères, `TURSO_DATABASE_URL` qui commence par `libsql://`, `TURSO_AUTH_TOKEN`…). Les variables ne s'appliquent qu'aux **nouveaux** déploiements : après les avoir ajoutées ou modifiées, clique sur *Redeploy*. Les détails sont dans *Deployments → Functions logs*.
+
 ### Autres hébergeurs
 
 Tout ce qui exécute Node fonctionne (un VPS, un Raspberry Pi, Fly.io, Render…) : définis les variables d'environnement,
