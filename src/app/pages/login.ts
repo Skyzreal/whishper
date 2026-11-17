@@ -10,8 +10,8 @@ import { Auth } from '../auth';
   imports: [FormsModule],
   template: `
     <section class="panel login">
-      <h1>Bonjour</h1>
-      <p class="lead">Les listes de souhaits de la famille. Commence par choisir ton prénom.</p>
+      <h1>Temps de Noël !!</h1>
+      <p class="lead">Les listes de souhaits de la famille. Choisit ton nom dans la liste !</p>
       <form (ngSubmit)="submit()">
         <label>
           Qui es-tu ?
