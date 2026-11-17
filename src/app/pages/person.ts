@@ -18,7 +18,7 @@ import { Item } from '../models';
         @if (canManage()) {
           <p>{{ owner() }} n'a pas de compte : c'est toi qui gères sa liste.</p>
         } @else {
-          <p>Clique sur « Je m'en occupe » pour réserver un cadeau. Les autres verront qu'il est pris, {{ owner() || name() }} non.</p>
+          <p>Clique sur "Je m'en occupe" pour réserver un cadeau. Les autres verront qu'il est pris, mais pas {{ owner() || name() }} !</p>
         }
       </div>
     </header>

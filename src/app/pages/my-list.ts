@@ -15,10 +15,10 @@ import { Item } from '../models';
       <app-avatar [name]="auth.user() ?? ''" [size]="56" />
       <div>
         <h1>Ma liste</h1>
-        <p>Tout le monde peut la lire, mais toi seul(e) peux la changer.</p>
+        <p>Tout le monde peut lire ta liste, pas de mode "privé" ou "à publier", juste toi peut la changer ! :)</p>
       </div>
     </header>
-    <p class="notice">Tu ne verras jamais ce qui a été réservé. C'est fait exprès, pour garder la surprise.</p>
+    <p class="notice">Hello ! :3 Tu verras jamais ce qui a été réservé!!! C'est fait exprès, pour garder la surprise! Tu peux mettre 40 fois carte cadeau Home Depot si tu veux, aucun check pour voir si c'est un doublon</p>
 
     <app-add-item [(open)]="adding" (added)="load()" />
 
@@ -31,7 +31,7 @@ import { Item } from '../models';
         <app-item-card [item]="item" mode="own" (remove)="remove($event)" />
       } @empty {
         @if (loaded()) {
-          <p class="empty">Ta liste est vide pour l'instant.</p>
+          <p class="empty">Wow ! C'est vide ici !</p>
         }
       }
     </div>
