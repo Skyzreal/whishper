@@ -45,7 +45,7 @@ Côté technique : s'il y a une réservation, deleteOwnItem ne supprime pas la l
   fonction serverless ([`api/index.ts`](api/index.ts)) ; ailleurs, c'est un simple serveur Node.
 - **Base de données :** [libSQL](https://github.com/tursodatabase/libsql) (SQLite). Un fichier local en développement, une base
   [Turso](https://turso.tech) gratuite en production. Le schéma est créé automatiquement.
-- **Connexion :** choisis ton prénom dans la liste de la famille + un code secret partagé. Un cookie signé et `HttpOnly` te garde connecté 30 jours.
+- **Connexion :** chacun a **son propre mot de passe**. À la toute première visite, tu choisis ton prénom, tu entres le code secret de la famille (preuve que tu en fais partie) puis tu crées ton mot de passe. Ensuite, prénom + mot de passe suffisent. Les mots de passe sont stockés hachés (scrypt, avec sel) ; le code de la famille ne permet jamais de se connecter à un compte existant. Un cookie signé et `HttpOnly` te garde connecté 30 jours.
 - **Prénoms :** la connexion ignore les accents, les majuscules et la forme Unicode (`stephanie`, `STÉPHANIE` et `Stéphanie` donnent le même résultat).
 - **Tests :** [Vitest](https://vitest.dev) (API avec supertest, plus tests des composants Angular).
 
@@ -61,7 +61,7 @@ npm run dev                 # API sur :3000, Angular sur http://localhost:4200
 
 Sous Windows PowerShell, utilise `Copy-Item .env.example .env`.
 
-Ouvre <http://localhost:4200>, choisis ton prénom et entre le code secret de ton fichier `.env`.
+Ouvre <http://localhost:4200>, choisis ton prénom, entre le code secret de ton fichier `.env` (`FAMILY_PASSCODE`) et crée ton mot de passe.
 La base de données locale est créée dans `data/whishper.db`.
 
 ### Variables d'environnement
@@ -69,7 +69,7 @@ La base de données locale est créée dans `data/whishper.db`.
 | Variable | Requise | Description |
 | --- | --- | --- |
 | `FAMILY_MEMBERS` | oui | Prénoms séparés par des virgules, au moins deux (p. ex. `Stéphanie,Michaël,Jade`). Les accents et les majuscules sont ignorés à la connexion. Renommer quelqu'un rend ses cadeaux existants orphelins. |
-| `FAMILY_PASSCODE` | oui | Code secret partagé que tout le monde entre pour se connecter. |
+| `FAMILY_PASSCODE` | oui | Code secret de la famille, demandé une seule fois par personne pour créer son mot de passe. Il ne sert plus à se connecter ensuite. |
 | `SESSION_SECRET` | oui | Chaîne aléatoire (16 caractères ou plus) servant à signer les cookies. La changer déconnecte tout le monde. |
 | `TURSO_DATABASE_URL` | production | p. ex. `libsql://your-db-org.turso.io`. Par défaut, le fichier local `file:data/whishper.db`. |
 | `TURSO_AUTH_TOKEN` | production | Jeton de la base Turso. |
@@ -84,13 +84,15 @@ La base de données locale est créée dans `data/whishper.db`.
 | `npm run test:api` / `npm run test:web` | Lance seulement l'un des deux |
 | `npm run typecheck` | Vérifie les types de l'API |
 | `npm run build` | Build de production de l'application Angular dans `dist/whishper/browser` |
+| `npm run reset-password -- Jade` | Efface le mot de passe de quelqu'un (oublié) : la personne en recrée un avec le code secret de la famille |
 | `npm start` | Sert l'API **et** l'application compilée depuis un seul processus Node (auto-hébergement) |
 
 ### Dépannage
 
 - En développement, ouvre l'application sur **http://localhost:4200**. Le port 3000 est réservé à l'API (il affiche un court message à `/`).
 - Si `npm run dev` échoue parce que le port 3000 ou 4200 est déjà utilisé, arrête l'autre processus d'abord ; `npm run dev` arrête les deux moitiés si l'une ne démarre pas.
-- Après avoir changé `FAMILY_MEMBERS` dans `.env`, redémarre `npm run dev`.
+- Après avoir changé `FAMILY_MEMBERS` dans `.env`, redémarre `npm run dev`. Le fichier `.env` n'est pas versionné : si tu récupères une mise à jour (p. ex. de nouveaux prénoms), modifie-le toi-même, et mets aussi à jour les variables d'environnement de Vercel.
+- **Mot de passe oublié ?** Lance `npm run reset-password -- Jade` (avec les mêmes variables d'environnement que l'application ; en production avec Turso, définis `TURSO_DATABASE_URL` et `TURSO_AUTH_TOKEN`). La personne pourra en créer un nouveau à sa prochaine connexion. Tu peux aussi exécuter `DELETE FROM credentials WHERE name = 'Jade';` dans la console Turso.
 
 ## Déploiement gratuit (Vercel + Turso)
 
@@ -104,7 +106,7 @@ La base de données locale est créée dans `data/whishper.db`.
    le dossier de sortie et le routage. Vercel détecte `api/index.ts` comme fonction serverless.
 3. **Ajoute les variables d'environnement** dans *Project → Settings → Environment Variables* :
    `FAMILY_MEMBERS`, `FAMILY_PASSCODE`, `SESSION_SECRET`, `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`.
-4. **Déploie.** Partage l'adresse et le code secret avec ta famille. 🎉
+4. **Déploie.** Partage l'adresse et le code secret avec ta famille : chacun crée son mot de passe à sa première visite. 🎉
 
 > Le système de fichiers de Vercel est en lecture seule et éphémère : tu dois donc utiliser Turso (pas le fichier SQLite local) en production.
 
@@ -116,7 +118,7 @@ Monte un volume persistant pour `data/` ou pointe `TURSO_DATABASE_URL` vers Turs
 
 ## Utilisation
 
-1. **Connecte-toi** avec ton prénom et le code secret de la famille.
+1. **Connecte-toi** avec ton prénom. La première fois, entre le code secret de la famille et crée ton mot de passe ; ensuite, ton mot de passe suffit.
 2. **Ma liste :** ajoute des cadeaux (colle un lien, modifie au besoin le titre ou le prix récupérés, ou décris quelque chose comme une carte-cadeau). Retire-les en tout temps.
 3. **Famille :** ouvre la liste de quelqu'un et clique sur **Je m'en occupe** pour ce que tu comptes acheter. Tu changes d'idée ? Clique sur **Annuler**.
 4. **Mes réservations :** retrouve tout ce que tu as réservé, classé par personne. Seul(e) toi y as accès.
@@ -144,4 +146,4 @@ src/app/  Application Angular (pages/, components/, api.ts, auth.ts)
 
 - Les aperçus de liens sont récupérés côté serveur avec un délai maximal, une taille maximale et une protection qui refuse les adresses privées ou locales.
 - Les écritures inter-sites sont refusées (cookie `SameSite=Lax` plus vérification de l'en-tête `Origin`), et les tentatives de connexion sont limitées par adresse IP (au mieux en mode serverless).
-- L'écran de connexion affiche les prénoms de la famille (pour que chacun trouve le sien), mais rien d'autre n'est accessible sans le code secret.
+- L'écran de connexion affiche les prénoms de la famille (pour que chacun trouve le sien), mais rien d'autre n'est accessible sans mot de passe. Les tentatives de connexion et de création de mot de passe sont limitées par adresse IP.

@@ -11,6 +11,7 @@ import {
   listReservations,
   unclaimItem,
 } from './items';
+import { MIN_PASSWORD_LENGTH, getPasswordHash, registeredNames, setInitialPassword, verifyPassword } from './password';
 import { fetchPreview as defaultFetchPreview, type Preview } from './scrape';
 import {
   COOKIE_NAME,
@@ -97,26 +98,61 @@ export function createApp({ config, getDb, fetchPreview = defaultFetchPreview }:
   const cookieAttrs = () =>
     `Path=/; HttpOnly; SameSite=Lax${config.secureCookies ? '; Secure' : ''}`;
 
-  api.post('/login', (req, res) => {
-    const ip = req.ip ?? 'unknown';
+  const tooManyAttempts = (ip: string) => {
+    const rec = attempts.get(ip);
+    return !!rec && rec.resetAt > Date.now() && rec.count >= MAX_ATTEMPTS;
+  };
+  const recordFailure = (ip: string) => {
     const now = Date.now();
     const rec = attempts.get(ip);
-    if (rec && rec.resetAt > now && rec.count >= MAX_ATTEMPTS) {
-      throw new HttpError(429, 'Trop de tentatives, réessaie plus tard');
-    }
-
-    const member = findMember(config.members, req.body?.name);
-    // Same failure for unknown names and wrong passcodes.
-    if (!member || !checkPasscode(req.body?.passcode, config.passcode)) {
-      attempts.set(ip, rec && rec.resetAt > now ? { ...rec, count: rec.count + 1 } : { count: 1, resetAt: now + WINDOW_MS });
-      throw new HttpError(401, 'Prénom ou code secret incorrect');
-    }
-    attempts.delete(ip);
+    attempts.set(ip, rec && rec.resetAt > now ? { ...rec, count: rec.count + 1 } : { count: 1, resetAt: now + WINDOW_MS });
+  };
+  const startSession = (res: Response, member: string) => {
     const token = createSessionToken(member, config.sessionSecret);
     res.setHeader('Set-Cookie', `${COOKIE_NAME}=${token}; Max-Age=${SESSION_MAX_AGE_S}; ${cookieAttrs()}`);
     res.json({ name: member });
+  };
+  const secret = (value: unknown): string => (typeof value === 'string' ? value : '');
+
+  api.post('/login', async (req, res) => {
+    const ip = req.ip ?? 'unknown';
+    if (tooManyAttempts(ip)) throw new HttpError(429, 'Trop de tentatives, réessaie plus tard');
+
+    const member = findMember(config.members, req.body?.name);
+    const stored = member ? await getPasswordHash(await getDb(), member) : null;
+    if (member && !stored) {
+      throw new HttpError(409, "Tu n'as pas encore de mot de passe : crée-le avec le code secret de la famille");
+    }
+    // Same failure for unknown names and wrong passwords.
+    if (!member || !stored || !(await verifyPassword(secret(req.body?.password), stored))) {
+      recordFailure(ip);
+      throw new HttpError(401, 'Prénom ou mot de passe incorrect');
+    }
+    attempts.delete(ip);
+    startSession(res, member);
   });
 
+  // First sign-in: the family passcode proves you belong, then you choose your own password.
+  api.post('/register', async (req, res) => {
+    const ip = req.ip ?? 'unknown';
+    if (tooManyAttempts(ip)) throw new HttpError(429, 'Trop de tentatives, réessaie plus tard');
+
+    const member = findMember(config.members, req.body?.name);
+    if (!member || !checkPasscode(req.body?.passcode, config.passcode)) {
+      recordFailure(ip);
+      throw new HttpError(401, 'Prénom ou code secret de la famille incorrect');
+    }
+    const password = secret(req.body?.password);
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      throw new HttpError(400, `Le mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH} caractères`);
+    }
+    if (password.length > 200) throw new HttpError(400, 'Le mot de passe est trop long');
+    if (!(await setInitialPassword(await getDb(), member, password))) {
+      throw new HttpError(409, 'Ce prénom a déjà un mot de passe : connecte-toi');
+    }
+    attempts.delete(ip);
+    startSession(res, member);
+  });
   api.post('/logout', (_req, res) => {
     res.setHeader('Set-Cookie', `${COOKIE_NAME}=; Max-Age=0; ${cookieAttrs()}`);
     res.json({ ok: true });
@@ -130,8 +166,9 @@ export function createApp({ config, getDb, fetchPreview = defaultFetchPreview }:
     next();
   };
 
-  api.get('/members', (_req, res) => {
-    res.json({ members: config.members });
+  api.get('/members', async (_req, res) => {
+    const registered = await registeredNames(await getDb());
+    res.json({ members: config.members, registered: config.members.filter((m) => registered.has(m)) });
   });
 
   api.get('/me', requireUser, (req, res) => {

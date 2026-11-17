@@ -18,8 +18,15 @@ export class Auth {
     return this.loading;
   }
 
-  async login(name: string, passcode: string): Promise<void> {
-    const r = await this.api.login(name, passcode);
+  async login(name: string, password: string): Promise<void> {
+    this.setUser(await this.api.login(name, password));
+  }
+
+  async register(name: string, passcode: string, password: string): Promise<void> {
+    this.setUser(await this.api.register(name, passcode, password));
+  }
+
+  private setUser(r: { name: string }) {
     this.loading = Promise.resolve();
     this.user.set(r.name);
   }
@@ -44,7 +51,7 @@ export const unauthorizedInterceptor: HttpInterceptorFn = (req, next) => {
   const router = inject(Router);
   return next(req).pipe(
     catchError((e: unknown) => {
-      const isAuthCall = /\/api\/(login|me|members)$/.test(req.url);
+      const isAuthCall = /\/api\/(login|register|me|members)$/.test(req.url);
       if (e instanceof HttpErrorResponse && e.status === 401 && !isAuthCall) {
         auth.user.set(null);
         router.navigateByUrl('/login');

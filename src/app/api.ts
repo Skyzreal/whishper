@@ -12,10 +12,12 @@ export function errorMessage(e: unknown): string {
 export class Api {
   private http = inject(HttpClient);
 
-  members = () => firstValueFrom(this.http.get<{ members: string[] }>('/api/members')).then((r) => r.members);
+  members = () => firstValueFrom(this.http.get<{ members: string[]; registered: string[] }>('/api/members'));
   me = () => firstValueFrom(this.http.get<{ name: string }>('/api/me'));
-  login = (name: string, passcode: string) =>
-    firstValueFrom(this.http.post<{ name: string }>('/api/login', { name, passcode }));
+  login = (name: string, password: string) =>
+    firstValueFrom(this.http.post<{ name: string }>('/api/login', { name, password }));
+  register = (name: string, passcode: string, password: string) =>
+    firstValueFrom(this.http.post<{ name: string }>('/api/register', { name, passcode, password }));
   logout = () => firstValueFrom(this.http.post('/api/logout', {}));
 
   people = () => firstValueFrom(this.http.get<{ me: string; people: Person[] }>('/api/people'));

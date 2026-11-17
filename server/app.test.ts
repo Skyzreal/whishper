@@ -41,8 +41,12 @@ afterAll(() => {
   }
 });
 
+const PASSWORD = 'mon-mot-de-passe';
+
+/** Creates the person's password on first use, then signs in with it. */
 async function login(name: string): Promise<string> {
-  const res = await request(app).post('/api/login').send({ name, passcode: config.passcode });
+  let res = await request(app).post('/api/register').send({ name, passcode: config.passcode, password: PASSWORD });
+  if (res.status === 409) res = await request(app).post('/api/login').send({ name, password: PASSWORD });
   expect(res.status).toBe(200);
   return (res.headers['set-cookie'] as unknown as string[])[0].split(';')[0];
 }
@@ -268,14 +272,62 @@ describe('auth', () => {
     expect((await request(app).get('/api/members')).body.members).toEqual(config.members);
   });
 
-  it('rejects wrong passcodes and unknown names with the same response', async () => {
-    const wrongPass = await request(app).post('/api/login').send({ name: 'Stéphanie', passcode: 'nope' });
-    const wrongName = await request(app).post('/api/login').send({ name: 'Mallory', passcode: config.passcode });
+  it('rejects wrong passwords and unknown names with the same response', async () => {
+    await login('Stéphanie');
+    const wrongPass = await request(app).post('/api/login').send({ name: 'Stéphanie', password: 'nope-nope' });
+    const wrongName = await request(app).post('/api/login').send({ name: 'Mallory', password: PASSWORD });
     expect(wrongPass.status).toBe(401);
     expect(wrongName.status).toBe(401);
     expect(wrongPass.body).toEqual(wrongName.body);
+    // The family passcode is not a password.
+    expect((await request(app).post('/api/login').send({ name: 'Stéphanie', password: config.passcode })).status).toBe(401);
   });
 
+  it('each person has their own password: one person cannot sign in as another', async () => {
+    await login('Stéphanie');
+    await request(app).post('/api/register').send({ name: 'Michaël', passcode: config.passcode, password: 'autre-secret' });
+    expect((await request(app).post('/api/login').send({ name: 'Stéphanie', password: 'autre-secret' })).status).toBe(401);
+    expect((await request(app).post('/api/login').send({ name: 'Michaël', password: 'autre-secret' })).status).toBe(200);
+    expect((await request(app).post('/api/login').send({ name: 'Michaël', password: PASSWORD })).status).toBe(401);
+  });
+
+  it('first sign-in needs the family passcode and cannot overwrite an existing password', async () => {
+    const bad = await request(app).post('/api/register').send({ name: 'Jade', passcode: 'nope', password: PASSWORD });
+    expect(bad.status).toBe(401);
+    const notMember = await request(app).post('/api/register').send({ name: 'Mallory', passcode: config.passcode, password: PASSWORD });
+    expect(notMember.status).toBe(401);
+    expect((await request(app).post('/api/login').send({ name: 'Stéphanie', password: PASSWORD })).status).toBe(409);
+
+    await login('Stéphanie');
+    const takeover = await request(app)
+      .post('/api/register')
+      .send({ name: 'Stéphanie', passcode: config.passcode, password: 'pirate-pass' });
+    expect(takeover.status).toBe(409);
+    expect((await request(app).post('/api/login').send({ name: 'Stéphanie', password: 'pirate-pass' })).status).toBe(401);
+    expect((await request(app).post('/api/login').send({ name: 'Stéphanie', password: PASSWORD })).status).toBe(200);
+  });
+
+  it('rejects short passwords and stores only a salted hash', async () => {
+    const short = await request(app).post('/api/register').send({ name: 'Stéphanie', passcode: config.passcode, password: '123' });
+    expect(short.status).toBe(400);
+    await login('Stéphanie');
+    const row = (await db.execute('SELECT hash FROM credentials')).rows[0]['hash'] as string;
+    expect(row).toMatch(/^scrypt\$/);
+    expect(row).not.toContain(PASSWORD);
+  });
+
+  it('lists who already has a password so the sign-in form can adapt', async () => {
+    await login('Stéphanie');
+    const body = (await request(app).get('/api/members')).body;
+    expect(body.members).toEqual(config.members);
+    expect(body.registered).toEqual(['Stéphanie']);
+  });
+
+  it('rate limits repeated wrong attempts', async () => {
+    await login('Stéphanie');
+    for (let i = 0; i < 10; i++) await request(app).post('/api/login').send({ name: 'Stéphanie', password: 'wrong-pass' });
+    expect((await request(app).post('/api/login').send({ name: 'Stéphanie', password: PASSWORD })).status).toBe(429);
+  });
   it('rejects tampered or forged session cookies', async () => {
     const cookie = await login('Stéphanie');
     const [name, token] = cookie.split('=');
@@ -287,12 +339,14 @@ describe('auth', () => {
   });
 
   it('signs in regardless of accents, case or Unicode form, and always uses the canonical name', async () => {
+    await login('Stéphanie');
     for (const typed of ['stephanie', 'STÉPHANIE', 'Ste\u0301phanie', ' Stéphanie ']) {
-      const res = await request(app).post('/api/login').send({ name: typed, passcode: config.passcode });
+      const res = await request(app).post('/api/login').send({ name: typed, password: PASSWORD });
       expect(res.status, typed).toBe(200);
       expect(res.body.name).toBe('Stéphanie');
     }
-    const michael = await request(app).post('/api/login').send({ name: 'michael', passcode: config.passcode });
+    await login('Michaël');
+    const michael = await request(app).post('/api/login').send({ name: 'michael', password: PASSWORD });
     expect(michael.body.name).toBe('Michaël');
   });
 
@@ -306,7 +360,8 @@ describe('auth', () => {
   });
 
   it('sets an HttpOnly cookie and clears it on logout', async () => {
-    const res = await request(app).post('/api/login').send({ name: 'stephanie', passcode: config.passcode });
+    await login('Stéphanie');
+    const res = await request(app).post('/api/login').send({ name: 'stephanie', password: PASSWORD });
     expect(res.body.name).toBe('Stéphanie');
     expect(String(res.headers['set-cookie'])).toMatch(/HttpOnly/);
     const out = await request(app).post('/api/logout');

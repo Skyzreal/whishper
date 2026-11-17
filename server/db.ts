@@ -15,6 +15,12 @@ const SCHEMA = [
     deleted_at TEXT
   )`,
   `CREATE INDEX IF NOT EXISTS items_owner_idx ON items (owner)`,
+  // One personal password per family member, chosen by them on first sign-in.
+  `CREATE TABLE IF NOT EXISTS credentials (
+    name       TEXT PRIMARY KEY,
+    hash       TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  )`,
   // Claims live in their own table so that owner-facing queries never touch it.
   `CREATE TABLE IF NOT EXISTS claims (
     item_id    INTEGER PRIMARY KEY REFERENCES items (id) ON DELETE CASCADE,

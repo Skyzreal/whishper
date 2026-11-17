@@ -8,6 +8,7 @@
     "dev:web": "ng serve --proxy-config proxy.conf.json",
     "build": "ng build",
     "start": "tsx server/main.ts",
+    "reset-password": "tsx server/reset-password.ts",
     "test": "npm run test:api && npm run test:web",
     "test:api": "vitest run --config server/vitest.config.mts",
     "test:web": "ng test --no-watch",
