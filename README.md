@@ -155,7 +155,10 @@ Amazon surtout, affichent une page de vérification anti-robot au lieu du produi
 server/   API Express : items.ts (règles de confidentialité), session.ts, scrape.ts (aperçu des liens + protection SSRF), app.ts
 api/      Point d'entrée serverless pour Vercel
 src/app/  Application Angular (pages/, components/, api.ts, auth.ts)
+public/   Favicon, icônes d'app (PWA) et manifest.webmanifest
 ```
+
+Les icônes de `public/` sont générées à partir des deux images sources avec `npm i --no-save sharp && node scripts/build-icons.mjs <icone-fond-bleu.png> <boite-transparente.png>` (inutile de le refaire pour déployer).
 
 ## Sécurité
 

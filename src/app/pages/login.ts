@@ -10,6 +10,7 @@ import { Auth } from '../auth';
   imports: [FormsModule],
   template: `
     <section class="panel login">
+      <img src="logo.png" alt="Whishper" class="login-logo" width="72" height="72">
       <h1>Temps de Noël !!</h1>
       <p class="lead">Les listes de souhaits de la famille. Choisit ton nom dans la liste !</p>
       <form (ngSubmit)="submit()">

@@ -9,7 +9,7 @@ import { Avatar } from './components/avatar';
   imports: [RouterOutlet, RouterLink, RouterLinkActive, Avatar],
   template: `
     <header class="topbar">
-      <a routerLink="/" class="brand">Whishper</a>
+      <a routerLink="/" class="brand"><img src="logo.png" alt="" class="brand-logo" width="32" height="32">Whishper</a>
       @if (auth.user(); as me) {
         <nav class="top-nav">
           <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Ma liste</a>
