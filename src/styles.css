@@ -67,7 +67,7 @@ a { color: var(--brand); text-underline-offset: 2px; }
 .me { display: flex; align-items: center; gap: 0.5rem; margin-left: auto; align-self: center; }
 .me-name { font-weight: 600; }
 
-.page { max-width: 760px; margin: 0 auto; padding: 2rem 1rem 4rem; }
+.page { width: 100%; max-width: 760px; margin: 0 auto; padding: 2rem 1rem 4rem; }
 .lead { color: var(--muted); margin: 0 0 1.25rem; }
 .back { display: inline-block; margin-bottom: 0.75rem; text-decoration: none; }
 .empty { color: var(--muted); padding: 2rem 0; font-style: italic; }
