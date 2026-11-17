@@ -1,4 +1,4 @@
-import { Component, output, signal } from '@angular/core';
+import { Component, model, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { inject } from '@angular/core';
 import { Api, errorMessage } from '../api';
@@ -7,8 +7,14 @@ import { Api, errorMessage } from '../api';
   selector: 'app-add-item',
   imports: [FormsModule],
   template: `
+    @if (!open()) {
+      <button type="button" class="add-toggle" (click)="open.set(true)"><span aria-hidden="true">＋</span> Ajouter un cadeau</button>
+    } @else {
     <form class="panel add" (ngSubmit)="submit()" #f="ngForm">
-      <h2>Ajoute quelque chose qui te ferait plaisir</h2>
+      <div class="panel-head">
+        <h2>Ajoute quelque chose qui te ferait plaisir</h2>
+        <button type="button" class="link" (click)="open.set(false)">Fermer</button>
+      </div>
       <label>
         Lien <span class="hint">(facultatif – colle la page d'un produit de n'importe quelle boutique)</span>
         <span class="row">
@@ -46,11 +52,13 @@ import { Api, errorMessage } from '../api';
       }
       <button type="submit" [disabled]="!title().trim() || saving()">{{ saving() ? 'Ajout…' : 'Ajouter à ma liste' }}</button>
     </form>
+    }
   `,
 })
 export class AddItem {
   private api = inject(Api);
   added = output<void>();
+  open = model(false);
 
   url = signal('');
   title = signal('');
@@ -105,6 +113,7 @@ export class AddItem {
       });
       for (const s of [this.url, this.title, this.price, this.note, this.image, this.hint]) s.set('');
       this.fetchedFor = '';
+      this.open.set(false);
       this.added.emit();
     } catch (e) {
       this.error.set(errorMessage(e));

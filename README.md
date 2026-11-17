@@ -27,7 +27,13 @@ Autres garanties, toutes couvertes par les tests de [`server/app.test.ts`](serve
 
 - La liste d'un propriétaire est identique avant et après qu'un cadeau soit réservé ou annulé.
 - Un propriétaire ne peut pas réserver ses propres cadeaux, et tenter d'annuler ne révèle rien (la réponse est toujours la même).
-- Seule la personne qui a réservé peut annuler sa réservation. Supprimer un cadeau supprime silencieusement sa réservation.
+- Seule la personne qui a réservé peut annuler sa réservation. Retirer un cadeau réservé ne laisse aucune trace côté propriétaire (voir ci-dessous).
+
+### Quand quelqu'un retire un cadeau que tu as réservé
+
+Le cadeau disparaît de la liste du propriétaire et de celle des autres, mais il reste dans **Mes réservations**, marqué « Retiré de sa liste », pour que tu saches de ne pas l'acheter. Un clic sur **Annuler** le fait disparaître pour de bon.
+
+Côté technique : s'il y a une réservation, deleteOwnItem ne supprime pas la ligne, elle pose seulement deleted_at (suppression logique). Si personne n'a réservé, la ligne est supprimée pour de vrai. Dans les deux cas, la réponse envoyée au propriétaire est identique ({ "ok": true }), et toutes les requêtes qui le concernent ignorent les cadeaux dont deleted_at est défini. Quand la personne qui a réservé annule, la ligne retirée est supprimée définitivement. Les bases de données existantes reçoivent la colonne deleted_at automatiquement au démarrage.
 
 > Remarque : la personne qui a accès au tableau de bord de l'hébergement ou à la base de données peut évidemment lire la table `claims`.
 > La règle de confidentialité protège les membres de la famille qui utilisent l'application, pas la personne qui l'administre.
@@ -113,6 +119,9 @@ Monte un volume persistant pour `data/` ou pointe `TURSO_DATABASE_URL` vers Turs
 1. **Connecte-toi** avec ton prénom et le code secret de la famille.
 2. **Ma liste :** ajoute des cadeaux (colle un lien, modifie au besoin le titre ou le prix récupérés, ou décris quelque chose comme une carte-cadeau). Retire-les en tout temps.
 3. **Famille :** ouvre la liste de quelqu'un et clique sur **Je m'en occupe** pour ce que tu comptes acheter. Tu changes d'idée ? Clique sur **Annuler**.
+4. **Mes réservations :** retrouve tout ce que tu as réservé, classé par personne. Seul(e) toi y as accès.
+
+L'interface est pensée pour le téléphone : sur un petit écran, une barre d'onglets en bas (Famille, Réservés, **Ajouter**, Ma liste) remplace le menu du haut.
 
 ### Aperçu des liens
 

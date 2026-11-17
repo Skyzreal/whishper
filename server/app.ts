@@ -8,6 +8,7 @@ import {
   countItemsByOwner,
   deleteOwnItem,
   getListForViewer,
+  listReservations,
   unclaimItem,
 } from './items';
 import { fetchPreview as defaultFetchPreview, type Preview } from './scrape';
@@ -151,6 +152,10 @@ export function createApp({ config, getDb, fetchPreview = defaultFetchPreview }:
     if (!owner) throw new HttpError(404, 'Personne introuvable');
     const items = await getListForViewer(await getDb(), viewer, owner);
     res.json({ owner, isMe: owner === viewer, items });
+  });
+
+  api.get('/reservations', requireUser, async (req, res) => {
+    res.json({ items: await listReservations(await getDb(), (req as AuthedRequest).user) });
   });
 
   api.get('/items', requireUser, async (req, res) => {

@@ -8,8 +8,12 @@ import { Person } from '../models';
   selector: 'app-people',
   imports: [RouterLink, Avatar],
   template: `
-    <h1>Famille</h1>
-    <p class="lead">Choisis quelqu'un pour voir ce qui lui ferait plaisir.</p>
+    <header class="hero">
+      <div>
+        <h1>Famille</h1>
+        <p>Choisis quelqu'un pour voir ce qui lui ferait plaisir.</p>
+      </div>
+    </header>
     @if (error()) {
       <p class="error" role="alert">{{ error() }}</p>
     }

@@ -60,7 +60,7 @@ export async function getListForViewer(
 ): Promise<OwnItem[] | OtherItem[]> {
   if (viewer === owner) {
     const res = await db.execute({
-      sql: 'SELECT id, owner, title, url, image, price, note, created_at FROM items WHERE owner = ? ORDER BY id DESC',
+      sql: 'SELECT id, owner, title, url, image, price, note, created_at FROM items WHERE owner = ? AND deleted_at IS NULL ORDER BY id DESC',
       args: [owner],
     });
     return res.rows.map((r) => toOwnItem(r as unknown as Record<string, unknown>));
@@ -69,7 +69,7 @@ export async function getListForViewer(
   const res = await db.execute({
     sql: `SELECT i.id, i.owner, i.title, i.url, i.image, i.price, i.note, i.created_at, c.claimer AS claimer
           FROM items i LEFT JOIN claims c ON c.item_id = i.id
-          WHERE i.owner = ? ORDER BY i.id DESC`,
+          WHERE i.owner = ? AND i.deleted_at IS NULL ORDER BY i.id DESC`,
     args: [owner],
   });
   return res.rows.map((r) => {
@@ -80,7 +80,7 @@ export async function getListForViewer(
 }
 
 export async function countItemsByOwner(db: Client): Promise<Map<string, number>> {
-  const res = await db.execute('SELECT owner, COUNT(*) AS n FROM items GROUP BY owner');
+  const res = await db.execute('SELECT owner, COUNT(*) AS n FROM items WHERE deleted_at IS NULL GROUP BY owner');
   return new Map(res.rows.map((r) => [String(r['owner']), Number(r['n'])]));
 }
 
@@ -96,14 +96,21 @@ export async function addItem(db: Client, owner: string, input: ItemInput): Prom
 export async function deleteOwnItem(db: Client, owner: string, itemId: number): Promise<boolean> {
   const tx = await db.transaction('write');
   try {
-    const found = await tx.execute({ sql: 'SELECT id FROM items WHERE id = ? AND owner = ?', args: [itemId, owner] });
+    const found = await tx.execute({ sql: 'SELECT id FROM items WHERE id = ? AND owner = ? AND deleted_at IS NULL', args: [itemId, owner] });
     if (!found.rows.length) {
       await tx.rollback();
       return false;
     }
-    // Remove claims explicitly (foreign keys may be off); the owner is never told they existed.
-    await tx.execute({ sql: 'DELETE FROM claims WHERE item_id = ?', args: [itemId] });
-    await tx.execute({ sql: 'DELETE FROM items WHERE id = ?', args: [itemId] });
+    // A claimed item is only hidden so the claimer keeps seeing it; either way the owner gets the same answer.
+    const claimed = await tx.execute({ sql: 'SELECT 1 FROM claims WHERE item_id = ?', args: [itemId] });
+    if (claimed.rows.length) {
+      await tx.execute({
+        sql: "UPDATE items SET deleted_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?",
+        args: [itemId],
+      });
+    } else {
+      await tx.execute({ sql: 'DELETE FROM items WHERE id = ?', args: [itemId] });
+    }
     await tx.commit();
     return true;
   } finally {
@@ -112,7 +119,7 @@ export async function deleteOwnItem(db: Client, owner: string, itemId: number): 
 }
 
 export async function claimItem(db: Client, viewer: string, itemId: number): Promise<void> {
-  const item = await db.execute({ sql: 'SELECT owner FROM items WHERE id = ?', args: [itemId] });
+  const item = await db.execute({ sql: 'SELECT owner FROM items WHERE id = ? AND deleted_at IS NULL', args: [itemId] });
   if (!item.rows.length) throw new HttpError(404, 'Cadeau introuvable');
   if (item.rows[0]['owner'] === viewer) throw new HttpError(403, 'Tu ne peux pas réserver un cadeau de ta propre liste');
 
@@ -129,4 +136,28 @@ export async function claimItem(db: Client, viewer: string, itemId: number): Pro
 /** Only ever removes the viewer's own claim; succeeds silently otherwise so nothing can be probed. */
 export async function unclaimItem(db: Client, viewer: string, itemId: number): Promise<void> {
   await db.execute({ sql: 'DELETE FROM claims WHERE item_id = ? AND claimer = ?', args: [itemId, viewer] });
+  // Once nobody holds a claim on an item its owner removed, nothing needs it any more.
+  await db.execute({
+    sql: `DELETE FROM items WHERE id = ? AND deleted_at IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM claims WHERE item_id = items.id)`,
+    args: [itemId],
+  });
+}
+
+/** An item the viewer reserved. `removed` is true when its owner took it off their list. */
+export interface Reservation extends OwnItem {
+  removed: boolean;
+}
+
+export async function listReservations(db: Client, viewer: string): Promise<Reservation[]> {
+  const res = await db.execute({
+    sql: `SELECT i.id, i.owner, i.title, i.url, i.image, i.price, i.note, i.created_at, i.deleted_at
+          FROM claims c JOIN items i ON i.id = c.item_id
+          WHERE c.claimer = ? ORDER BY i.owner, i.id DESC`,
+    args: [viewer],
+  });
+  return res.rows.map((r) => {
+    const row = r as unknown as Record<string, unknown>;
+    return { ...toOwnItem(row), removed: row['deleted_at'] != null };
+  });
 }

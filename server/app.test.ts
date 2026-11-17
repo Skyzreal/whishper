@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { Client } from '@libsql/client';
+import { createClient, type Client } from '@libsql/client';
 import request from 'supertest';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from './app';
@@ -114,10 +114,90 @@ describe('privacy: the owner never receives claim data', () => {
     expect((await carol.get('/api/people/St%C3%A9phanie/items')).body.items[0].claimed).toBe(true);
   });
 
-  it('deleting a claimed item works for the owner and leaves no trace', async () => {
+  it('deleting a claimed item works for the owner and the response is identical to deleting an unclaimed one', async () => {
     const { alice, id } = await aliceWithClaimedItem();
-    expect((await alice.delete(`/api/items/${id}`)).status).toBe(200);
-    expect((await db.execute('SELECT COUNT(*) AS n FROM claims')).rows[0]['n']).toBe(0);
+    const plain = (await alice.post('/api/items').send({ title: 'Plain' })).body.item.id as number;
+    const claimedRes = await alice.delete(`/api/items/${id}`);
+    const plainRes = await alice.delete(`/api/items/${plain}`);
+    expect(claimedRes.status).toBe(plainRes.status);
+    expect(claimedRes.body).toEqual(plainRes.body);
+    expect(JSON.stringify(claimedRes.body)).toBe(JSON.stringify({ ok: true }));
+  });
+});
+
+describe('removing an item that someone reserved', () => {
+  it('leaves the owner with no trace: same responses as if the item never had a claim', async () => {
+    const alice = as(await login('Stéphanie'));
+    const bob = as(await login('Michaël'));
+    const snapshot = async () => ({
+      items: (await alice.get('/api/items')).body,
+      people: (await alice.get('/api/people')).body,
+      own: (await alice.get('/api/people/St%C3%A9phanie/items')).body,
+    });
+    const keep = (await alice.post('/api/items').send({ title: 'Keep' })).body.item.id as number;
+    const beforeClaimedExisted = await snapshot();
+    const claimed = (await alice.post('/api/items').send({ title: 'Claimed' })).body.item.id as number;
+    await bob.post(`/api/items/${claimed}/claim`);
+
+    await alice.delete(`/api/items/${claimed}`);
+    const afterClaimed = await snapshot();
+
+    expect(afterClaimed).toEqual(beforeClaimedExisted);
+    expect(afterClaimed.items.items.map((i: { id: number }) => i.id)).toEqual([keep]);
+    const raw = JSON.stringify(afterClaimed).toLowerCase();
+    for (const word of ['claim', 'removed', 'deleted', 'retiré']) expect(raw).not.toContain(word);
+    // The owner cannot even tell the item still exists: it is simply not found.
+    expect((await alice.delete(`/api/items/${claimed}`)).status).toBe(404);
+    expect((await alice.post(`/api/items/${claimed}/claim`)).status).toBe(404);
+  });
+
+  it('keeps the item for the claimer, flagged as removed, and hides it from everyone else', async () => {
+    const { alice, bob, carol, id } = await aliceWithClaimedItem();
+    await alice.delete(`/api/items/${id}`);
+
+    const mine = (await bob.get('/api/reservations')).body.items;
+    expect(mine).toHaveLength(1);
+    expect(mine[0]).toMatchObject({ id, owner: 'Stéphanie', title: 'Cozy socks', removed: true });
+
+    for (const viewer of [bob, carol]) {
+      expect((await viewer.get('/api/people/St%C3%A9phanie/items')).body.items).toEqual([]);
+    }
+    const people = (await carol.get('/api/people')).body.people as { name: string; itemCount: number }[];
+    expect(people.find((p) => p.name === 'Stéphanie')?.itemCount).toBe(0);
+    expect((await carol.get('/api/reservations')).body.items).toEqual([]);
+    // Nobody can grab it in the meantime.
+    expect((await carol.post(`/api/items/${id}/claim`)).status).toBe(404);
+  });
+
+  it('is gone for good once the claimer cancels', async () => {
+    const { alice, bob, id } = await aliceWithClaimedItem();
+    await alice.delete(`/api/items/${id}`);
+    expect((await bob.delete(`/api/items/${id}/claim`)).status).toBe(200);
+    expect((await bob.get('/api/reservations')).body.items).toEqual([]);
+    expect((await db.execute({ sql: 'SELECT COUNT(*) AS n FROM items WHERE id = ?', args: [id] })).rows[0]['n']).toBe(0);
+    expect((await db.execute({ sql: 'SELECT COUNT(*) AS n FROM claims WHERE item_id = ?', args: [id] })).rows[0]['n']).toBe(0);
+  });
+
+  it('lists active reservations unflagged and lets only the claimer cancel them', async () => {
+    const { alice, bob, carol, id } = await aliceWithClaimedItem();
+    expect((await bob.get('/api/reservations')).body.items[0]).toMatchObject({ id, removed: false });
+    expect((await alice.get('/api/reservations')).body.items).toEqual([]);
+
+    // Another member cancelling a removed item's claim must not erase the claimer's reservation.
+    await alice.delete(`/api/items/${id}`);
+    await carol.delete(`/api/items/${id}/claim`);
+    expect((await bob.get('/api/reservations')).body.items).toHaveLength(1);
+  });
+
+  it('migrates a database created before soft deletes existed', async () => {
+    const old = createClient({ url: `file:${join(dir, 'old.db')}` });
+    opened.push(old);
+    await old.execute('CREATE TABLE items (id INTEGER PRIMARY KEY AUTOINCREMENT, owner TEXT NOT NULL, title TEXT NOT NULL, url TEXT, image TEXT, price TEXT, note TEXT, created_at TEXT NOT NULL DEFAULT (strftime(\'%Y-%m-%dT%H:%M:%fZ\', \'now\')))');
+    await old.execute("INSERT INTO items (owner, title) VALUES ('Stéphanie', 'Old')");
+    old.close();
+    const migrated = await openDb(`file:${join(dir, 'old.db')}`);
+    opened.push(migrated);
+    expect((await migrated.execute('SELECT deleted_at FROM items')).rows[0]['deleted_at']).toBeNull();
   });
 });
 

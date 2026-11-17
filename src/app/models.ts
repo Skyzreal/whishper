@@ -10,6 +10,8 @@ export interface Item {
   /** Only present on other people's lists, never on your own. */
   claimed?: boolean;
   claimedByMe?: boolean;
+  /** Only on the reservations page: the owner took this item off their list. */
+  removed?: boolean;
 }
 
 export interface Person {

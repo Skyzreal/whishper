@@ -9,17 +9,14 @@ import { Item } from '../models';
   selector: 'app-person',
   imports: [ItemCard, Avatar, RouterLink],
   template: `
-    <a routerLink="/people" class="back">    ← Famille</a>
-    <header class="person-head">
+    <header class="hero">
+      <div class="hero-back"><a routerLink="/people" class="back">‹ Famille</a></div>
       <app-avatar [name]="owner() || name()" [size]="56" />
       <div>
-            <h1>Liste de souhaits de {{ owner() || name() }}</h1>
-        <p class="lead">
-              Clique sur « Je m'en occupe » pour réserver un cadeau. Les autres verront qu'il est pris, mais {{ owner() || name() }} ne le verra jamais.
-        </p>
+        <h1>Liste de souhaits de {{ owner() || name() }}</h1>
+        <p>Appuie sur « Je m'en occupe » pour réserver un cadeau. Les autres verront qu'il est pris, mais {{ owner() || name() }} ne le verra jamais.</p>
       </div>
     </header>
-
     @if (error()) {
       <p class="error" role="alert">{{ error() }}</p>
     }

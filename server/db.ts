@@ -11,7 +11,8 @@ const SCHEMA = [
     image      TEXT,
     price      TEXT,
     note       TEXT,
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    deleted_at TEXT
   )`,
   `CREATE INDEX IF NOT EXISTS items_owner_idx ON items (owner)`,
   // Claims live in their own table so that owner-facing queries never touch it.
@@ -29,5 +30,10 @@ export async function openDb(url: string, authToken?: string): Promise<Client> {
   }
   const db = createClient({ url, authToken });
   await db.batch(SCHEMA, 'write');
+  // Databases created before soft deletes existed lack this column.
+  const cols = await db.execute('PRAGMA table_info(items)');
+  if (!cols.rows.some((r) => r['name'] === 'deleted_at')) {
+    await db.execute('ALTER TABLE items ADD COLUMN deleted_at TEXT');
+  }
   return db;
 }

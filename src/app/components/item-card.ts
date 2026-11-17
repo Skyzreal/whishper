@@ -5,7 +5,7 @@ import { Item } from '../models';
   selector: 'app-item-card',
   template: `
     @let i = item();
-    <article class="card" [class.taken]="mode() === 'other' && i.claimed && !i.claimedByMe" [class.mine]="mode() === 'other' && i.claimedByMe">
+    <article class="card" [class.taken]="mode() === 'other' && i.claimed && !i.claimedByMe" [class.mine]="mode() === 'other' && i.claimedByMe" [class.removed]="i.removed">
       <div class="thumb">
         @if (i.image) {
           <img [src]="i.image" alt="" loading="lazy" referrerpolicy="no-referrer" />
@@ -28,6 +28,13 @@ import { Item } from '../models';
       <div class="actions">
         @if (mode() === 'own') {
           <button type="button" class="danger" (click)="remove.emit(i)"          >Retirer</button>
+        } @else if (mode() === 'reservation') {
+          @if (i.removed) {
+            <span class="badge taken">Retiré de sa liste</span>
+          } @else {
+            <span class="badge mine">✓ Tu t'en occupes</span>
+          }
+          <button type="button" class="secondary" (click)="unclaim.emit(i)">Annuler</button>
         } @else if (i.claimedByMe) {
                     <span class="badge mine">✓ Tu t'en occupes</span>
                     <button type="button" class="secondary" (click)="unclaim.emit(i)">Annuler</button>
@@ -43,7 +50,7 @@ import { Item } from '../models';
 export class ItemCard {
   item = input.required<Item>();
   /** 'own' renders only owner-safe controls; there is no claim UI at all. */
-  mode = input.required<'own' | 'other'>();
+  mode = input.required<'own' | 'other' | 'reservation'>();
 
   claim = output<Item>();
   unclaim = output<Item>();

@@ -13,7 +13,7 @@ const base: Item = {
   createdAt: '2026-01-01T00:00:00Z',
 };
 
-function render(item: Item, mode: 'own' | 'other'): HTMLElement {
+function render(item: Item, mode: 'own' | 'other' | 'reservation'): HTMLElement {
   const fixture: ComponentFixture<ItemCard> = TestBed.createComponent(ItemCard);
   fixture.componentRef.setInput('item', item);
   fixture.componentRef.setInput('mode', mode);
@@ -46,4 +46,16 @@ describe('ItemCard', () => {
     expect(el.textContent).toContain("Tu t'en occupes");
     expect(el.querySelector('button')?.textContent).toContain('Annuler');
   });
-});
+
+  it('flags a reservation whose owner removed it, and still lets the claimer cancel', () => {
+    const el = render({ ...base, removed: true }, 'reservation');
+    expect(el.textContent).toContain('Retiré de sa liste');
+    expect(el.querySelector('.card.removed')).not.toBeNull();
+    expect(el.querySelector('button')?.textContent).toContain('Annuler');
+  });
+
+  it('shows an active reservation as yours', () => {
+    const el = render({ ...base, removed: false }, 'reservation');
+    expect(el.textContent).toContain("Tu t'en occupes");
+    expect(el.textContent).not.toContain('Retiré');
+  });});

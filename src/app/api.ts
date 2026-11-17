@@ -21,6 +21,7 @@ export class Api {
   people = () => firstValueFrom(this.http.get<{ me: string; people: Person[] }>('/api/people'));
   personList = (name: string) =>
     firstValueFrom(this.http.get<PersonList>(`/api/people/${encodeURIComponent(name)}/items`));
+  reservations = () => firstValueFrom(this.http.get<{ items: Item[] }>('/api/reservations')).then((r) => r.items);
   myItems = () => firstValueFrom(this.http.get<{ items: Item[] }>('/api/items')).then((r) => r.items);
 
   addItem = (item: NewItem) => firstValueFrom(this.http.post<{ item: Item }>('/api/items', item));
