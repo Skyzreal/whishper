@@ -11,7 +11,7 @@ import {
   listReservations,
   unclaimItem,
 } from './items';
-import { MIN_PASSWORD_LENGTH, getPasswordHash, registeredNames, setInitialPassword, verifyPassword } from './password';
+import { MIN_PASSWORD_LENGTH, getPasswordHash, registeredNames, replacePassword, setInitialPassword, verifyPassword } from './password';
 import { fetchPreview as defaultFetchPreview, type Preview } from './scrape';
 import {
   COOKIE_NAME,
@@ -98,14 +98,14 @@ export function createApp({ config, getDb, fetchPreview = defaultFetchPreview }:
   const cookieAttrs = () =>
     `Path=/; HttpOnly; SameSite=Lax${config.secureCookies ? '; Secure' : ''}`;
 
-  const tooManyAttempts = (ip: string) => {
-    const rec = attempts.get(ip);
+  const tooManyAttempts = (key: string) => {
+    const rec = attempts.get(key);
     return !!rec && rec.resetAt > Date.now() && rec.count >= MAX_ATTEMPTS;
   };
-  const recordFailure = (ip: string) => {
+  const recordFailure = (key: string) => {
     const now = Date.now();
-    const rec = attempts.get(ip);
-    attempts.set(ip, rec && rec.resetAt > now ? { ...rec, count: rec.count + 1 } : { count: 1, resetAt: now + WINDOW_MS });
+    const rec = attempts.get(key);
+    attempts.set(key, rec && rec.resetAt > now ? { ...rec, count: rec.count + 1 } : { count: 1, resetAt: now + WINDOW_MS });
   };
   const startSession = (res: Response, member: string) => {
     const token = createSessionToken(member, config.sessionSecret);
@@ -160,6 +160,29 @@ export function createApp({ config, getDb, fetchPreview = defaultFetchPreview }:
     attempts.delete(ip);
     startSession(res, member);
   });
+  // Forgotten password: the family passcode proves you belong, then you choose a new password.
+  // Limited per IP (shared with login) and per name, so the passcode can't be guessed from many addresses.
+  api.post('/reset-password', async (req, res) => {
+    const ip = req.ip ?? 'unknown';
+    const member = findMember(config.members, req.body?.name);
+    const keys = member ? [ip, `reset:${member}`] : [ip];
+    if (keys.some(tooManyAttempts)) throw new HttpError(429, 'Trop de tentatives, réessaie plus tard');
+
+    if (member) refuseManaged(member);
+    if (!member || !checkPasscode(req.body?.passcode, config.passcode)) {
+      keys.forEach(recordFailure);
+      throw new HttpError(401, 'Prénom ou code secret de la famille incorrect');
+    }
+    const password = secret(req.body?.password);
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      throw new HttpError(400, `Le mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH} caractères`);
+    }
+    if (password.length > 200) throw new HttpError(400, 'Le mot de passe est trop long');
+    await replacePassword(await getDb(), member, password);
+    keys.forEach((k) => attempts.delete(k));
+    startSession(res, member);
+  });
+
   api.post('/logout', (_req, res) => {
     res.setHeader('Set-Cookie', `${COOKIE_NAME}=; Max-Age=0; ${cookieAttrs()}`);
     res.json({ ok: true });

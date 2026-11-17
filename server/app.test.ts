@@ -329,6 +329,71 @@ describe('auth', () => {
     for (let i = 0; i < 10; i++) await request(app).post('/api/login').send({ name: 'Stéphanie', password: 'wrong-pass' });
     expect((await request(app).post('/api/login').send({ name: 'Stéphanie', password: PASSWORD })).status).toBe(429);
   });
+
+  describe('password reset', () => {
+    const reset = (body: object) => request(app).post('/api/reset-password').send(body);
+
+    it('replaces the password with the family passcode: the old one stops working and the person is signed in', async () => {
+      await login('Stéphanie');
+      const before = (await db.execute('SELECT hash FROM credentials')).rows[0]['hash'];
+      const res = await reset({ name: 'stephanie', passcode: config.passcode, password: 'nouveau-secret' });
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ name: 'Stéphanie' });
+      expect(String(res.headers['set-cookie'])).toMatch(/HttpOnly/);
+      const rows = (await db.execute('SELECT hash FROM credentials')).rows;
+      expect(rows).toHaveLength(1);
+      expect(rows[0]['hash']).not.toBe(before);
+      expect(rows[0]['hash']).toMatch(/^scrypt\$/);
+      expect((await request(app).post('/api/login').send({ name: 'Stéphanie', password: PASSWORD })).status).toBe(401);
+      expect((await request(app).post('/api/login').send({ name: 'Stéphanie', password: 'nouveau-secret' })).status).toBe(200);
+    });
+
+    it('rejects a wrong passcode, unknown names and managed children with the same message, and changes nothing', async () => {
+      await login('Stéphanie');
+      const wrongCode = await reset({ name: 'Stéphanie', passcode: 'nope', password: 'nouveau-secret' });
+      const unknown = await reset({ name: 'Mallory', passcode: config.passcode, password: 'nouveau-secret' });
+      const unknownBadCode = await reset({ name: 'Mallory', passcode: 'nope', password: 'nouveau-secret' });
+      expect(wrongCode.status).toBe(401);
+      expect(unknown.status).toBe(401);
+      expect(wrongCode.body).toEqual(unknown.body);
+      expect(unknownBadCode.body).toEqual(unknown.body);
+      expect((await reset({ name: 'Orélie', passcode: config.passcode, password: 'nouveau-secret' })).status).toBe(403);
+      expect((await request(app).post('/api/login').send({ name: 'Stéphanie', password: PASSWORD })).status).toBe(200);
+    });
+
+    it('enforces the same password rules as the first sign-in', async () => {
+      await login('Stéphanie');
+      expect((await reset({ name: 'Stéphanie', passcode: config.passcode, password: '123' })).status).toBe(400);
+      expect((await reset({ name: 'Stéphanie', passcode: config.passcode })).status).toBe(400);
+      expect((await request(app).post('/api/login').send({ name: 'Stéphanie', password: PASSWORD })).status).toBe(200);
+    });
+
+    it('also works for someone who never set a password, and reveals nothing about claims', async () => {
+      const res = await reset({ name: 'Nathaniel', passcode: config.passcode, password: 'nouveau-secret' });
+      expect(res.status).toBe(200);
+      expect(Object.keys(res.body)).toEqual(['name']);
+    });
+
+    it('rate limits wrong passcodes per address, then even the right one is refused', async () => {
+      await login('Stéphanie');
+      for (let i = 0; i < 10; i++) await reset({ name: 'Mallory', passcode: 'nope', password: 'nouveau-secret' });
+      const res = await reset({ name: 'Stéphanie', passcode: config.passcode, password: 'nouveau-secret' });
+      expect(res.status).toBe(429);
+      expect((await request(app).post('/api/login').send({ name: 'Stéphanie', password: PASSWORD })).status).toBe(429);
+    });
+
+    it('rate limits per name even when the address changes', async () => {
+      await login('Stéphanie');
+      for (let i = 0; i < 10; i++) {
+        await request(app).post('/api/reset-password').set('X-Forwarded-For', `10.0.0.${i}`).send({ name: 'Stéphanie', passcode: 'nope', password: 'nouveau-secret' });
+      }
+      const res = await request(app)
+        .post('/api/reset-password')
+        .set('X-Forwarded-For', '10.9.9.9')
+        .send({ name: 'Stéphanie', passcode: config.passcode, password: 'nouveau-secret' });
+      expect(res.status).toBe(429);
+    });
+  });
   it('rejects tampered or forged session cookies', async () => {
     const cookie = await login('Stéphanie');
     const [name, token] = cookie.split('=');

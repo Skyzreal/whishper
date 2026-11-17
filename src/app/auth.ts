@@ -26,6 +26,10 @@ export class Auth {
     this.setUser(await this.api.register(name, passcode, password));
   }
 
+  async resetPassword(name: string, passcode: string, password: string): Promise<void> {
+    this.setUser(await this.api.resetPassword(name, passcode, password));
+  }
+
   private setUser(r: { name: string }) {
     this.loading = Promise.resolve();
     this.user.set(r.name);
@@ -51,7 +55,7 @@ export const unauthorizedInterceptor: HttpInterceptorFn = (req, next) => {
   const router = inject(Router);
   return next(req).pipe(
     catchError((e: unknown) => {
-      const isAuthCall = /\/api\/(login|register|me|members)$/.test(req.url);
+      const isAuthCall = /\/api\/(login|register|reset-password|me|members)$/.test(req.url);
       if (e instanceof HttpErrorResponse && e.status === 401 && !isAuthCall) {
         auth.user.set(null);
         router.navigateByUrl('/login');

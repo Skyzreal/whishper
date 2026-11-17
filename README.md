@@ -95,7 +95,7 @@ La base de données locale est créée dans `data/whishper.db`.
 | `npm run test:api` / `npm run test:web` | Lance seulement l'un des deux |
 | `npm run typecheck` | Vérifie les types de l'API |
 | `npm run build` | Build de production de l'application Angular dans `dist/whishper/browser` |
-| `npm run reset-password -- Jade` | Efface le mot de passe de quelqu'un (oublié) : la personne en recrée un avec le code secret de la famille |
+| `npm run reset-password -- Jade` | Efface le mot de passe de quelqu'un (secours : l'oubli se règle normalement depuis la page de connexion) ; la personne en recrée un avec le code secret de la famille |
 | `npm start` | Sert l'API **et** l'application compilée depuis un seul processus Node (auto-hébergement) |
 
 ### Dépannage
@@ -103,7 +103,7 @@ La base de données locale est créée dans `data/whishper.db`.
 - En développement, ouvre l'application sur **http://localhost:4200**. Le port 3000 est réservé à l'API (il affiche un court message à `/`).
 - Si `npm run dev` échoue parce que le port 3000 ou 4200 est déjà utilisé, arrête l'autre processus d'abord ; `npm run dev` arrête les deux moitiés si l'une ne démarre pas.
 - Après avoir changé `FAMILY_MEMBERS` dans `.env`, redémarre `npm run dev`. Le fichier `.env` n'est pas versionné : si tu récupères une mise à jour (p. ex. de nouveaux prénoms), modifie-le toi-même, et mets aussi à jour les variables d'environnement de Vercel.
-- **Mot de passe oublié ?** Lance `npm run reset-password -- Jade` (avec les mêmes variables d'environnement que l'application ; en production avec Turso, définis `TURSO_DATABASE_URL` et `TURSO_AUTH_TOKEN`). La personne pourra en créer un nouveau à sa prochaine connexion. Tu peux aussi exécuter `DELETE FROM credentials WHERE name = 'Jade';` dans la console Turso.
+- **Mot de passe oublié ?** Sur la page de connexion, la personne choisit son prénom puis clique sur **« Mot de passe oublié ? »** : elle entre le code secret de la famille (`FAMILY_PASSCODE`) et choisit un nouveau mot de passe (6 caractères minimum, avec confirmation). Aucun courriel n'est envoyé. Les tentatives sont limitées (10 échecs par adresse IP et par prénom, puis 15 minutes d'attente). Les sessions déjà ouvertes restent valides jusqu'à leur expiration. En dernier recours, tu peux aussi lancer `npm run reset-password -- Jade` (avec les mêmes variables d'environnement que l'application ; en production avec Turso, définis `TURSO_DATABASE_URL` et `TURSO_AUTH_TOKEN`) ou exécuter `DELETE FROM credentials WHERE name = 'Jade';` dans la console Turso : la personne pourra alors recréer un mot de passe à sa prochaine connexion.
 
 ## Déploiement gratuit (Vercel + Turso)
 

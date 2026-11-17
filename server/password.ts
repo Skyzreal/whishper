@@ -37,6 +37,14 @@ export async function setInitialPassword(db: Client, name: string, password: str
   return res.rowsAffected > 0;
 }
 
+/** Creates or replaces the person's password (used by the "forgot password" flow). */
+export async function replacePassword(db: Client, name: string, password: string): Promise<void> {
+  await db.execute({
+    sql: 'INSERT INTO credentials (name, hash) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET hash = excluded.hash',
+    args: [name, await hashPassword(password)],
+  });
+}
+
 export async function registeredNames(db: Client): Promise<Set<string>> {
   const res = await db.execute('SELECT name FROM credentials');
   return new Set(res.rows.map((r) => String(r['name'])));

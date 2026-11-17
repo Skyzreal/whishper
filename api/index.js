@@ -24561,6 +24561,12 @@ async function setInitialPassword(db, name, password) {
   });
   return res.rowsAffected > 0;
 }
+async function replacePassword(db, name, password) {
+  await db.execute({
+    sql: "INSERT INTO credentials (name, hash) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET hash = excluded.hash",
+    args: [name, await hashPassword(password)]
+  });
+}
 async function registeredNames(db) {
   const res = await db.execute("SELECT name FROM credentials");
   return new Set(res.rows.map((r) => String(r["name"])));
@@ -24945,14 +24951,14 @@ function createApp({ config, getDb, fetchPreview: fetchPreview2 = fetchPreview }
   const MAX_ATTEMPTS = 10;
   const WINDOW_MS = 15 * 60 * 1e3;
   const cookieAttrs = () => `Path=/; HttpOnly; SameSite=Lax${config.secureCookies ? "; Secure" : ""}`;
-  const tooManyAttempts = (ip) => {
-    const rec = attempts.get(ip);
+  const tooManyAttempts = (key) => {
+    const rec = attempts.get(key);
     return !!rec && rec.resetAt > Date.now() && rec.count >= MAX_ATTEMPTS;
   };
-  const recordFailure = (ip) => {
+  const recordFailure = (key) => {
     const now = Date.now();
-    const rec = attempts.get(ip);
-    attempts.set(ip, rec && rec.resetAt > now ? { ...rec, count: rec.count + 1 } : { count: 1, resetAt: now + WINDOW_MS });
+    const rec = attempts.get(key);
+    attempts.set(key, rec && rec.resetAt > now ? { ...rec, count: rec.count + 1 } : { count: 1, resetAt: now + WINDOW_MS });
   };
   const startSession = (res, member) => {
     const token = createSessionToken(member, config.sessionSecret);
@@ -24999,6 +25005,25 @@ function createApp({ config, getDb, fetchPreview: fetchPreview2 = fetchPreview }
       throw new HttpError(409, "Ce pr\xE9nom a d\xE9j\xE0 un mot de passe : connecte-toi");
     }
     attempts.delete(ip);
+    startSession(res, member);
+  });
+  api.post("/reset-password", async (req, res) => {
+    const ip = req.ip ?? "unknown";
+    const member = findMember(config.members, req.body?.name);
+    const keys = member ? [ip, `reset:${member}`] : [ip];
+    if (keys.some(tooManyAttempts)) throw new HttpError(429, "Trop de tentatives, r\xE9essaie plus tard");
+    if (member) refuseManaged(member);
+    if (!member || !checkPasscode(req.body?.passcode, config.passcode)) {
+      keys.forEach(recordFailure);
+      throw new HttpError(401, "Pr\xE9nom ou code secret de la famille incorrect");
+    }
+    const password = secret(req.body?.password);
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      throw new HttpError(400, `Le mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH} caract\xE8res`);
+    }
+    if (password.length > 200) throw new HttpError(400, "Le mot de passe est trop long");
+    await replacePassword(await getDb(), member, password);
+    keys.forEach((k) => attempts.delete(k));
     startSession(res, member);
   });
   api.post("/logout", (_req, res) => {

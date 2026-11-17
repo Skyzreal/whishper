@@ -24,16 +24,20 @@ import { Auth } from '../auth';
             }
           </select>
         </label>
-        @if (name() && isNew()) {
+        @if (name() && needsCode()) {
           <p class="hint">
-            Première visite ? Entre le code de la famille, puis choisis ton mot de passe.
+            @if (resetting()) {
+              Mot de passe oublié ? Entre le code de la famille, puis choisis un nouveau mot de passe.
+            } @else {
+              Première visite ? Entre le code de la famille, puis choisis ton mot de passe.
+            }
           </p>
           <label>
             Code de la famille
             <input name="passcode" type="password" autocomplete="off" required [(ngModel)]="passcode" />
           </label>
           <label>
-            Ton mot de passe <span class="hint">(6 caractères minimum)</span>
+            {{ resetting() ? 'Ton nouveau mot de passe' : 'Ton mot de passe' }} <span class="hint">(6 caractères minimum)</span>
             <input name="newPassword" type="password" autocomplete="new-password" minlength="6" required [(ngModel)]="password" />
           </label>
           <label>
@@ -50,8 +54,13 @@ import { Auth } from '../auth';
           <p class="error" role="alert">{{ error() }}</p>
         }
         <button type="submit" [disabled]="!canSubmit() || busy()">
-          {{ busy() ? 'Connexion…' : isNew() ? 'Créer mon compte' : 'Se connecter' }}
+          {{ busy() ? 'Connexion…' : resetting() ? 'Changer mon mot de passe' : isNew() ? 'Créer mon compte' : 'Se connecter' }}
         </button>
+        @if (name() && !isNew()) {
+          <button type="button" class="link forgot" (click)="toggleReset()">
+            {{ resetting() ? '← Retour à la connexion' : 'Mot de passe oublié ?' }}
+          </button>
+        }
       </form>
     </section>  `,
 })
@@ -69,9 +78,12 @@ export class Login implements OnInit {
   busy = signal(false);
   error = signal('');
 
+  resetting = signal(false);
+
   isNew = computed(() => !!this.name() && !this.registered().includes(this.name()));
+  needsCode = computed(() => this.isNew() || this.resetting());
   canSubmit = computed(() =>
-    this.isNew()
+    this.needsCode()
       ? !!this.passcode() && this.password().length >= 6 && this.confirm().length > 0
       : !!this.name() && !!this.password(),
   );
@@ -85,6 +97,16 @@ export class Login implements OnInit {
 
   pick(name: string) {
     this.name.set(name);
+    this.clearFields();
+    this.resetting.set(false);
+  }
+
+  toggleReset() {
+    this.resetting.update((v) => !v);
+    this.clearFields();
+  }
+
+  private clearFields() {
     this.passcode.set('');
     this.password.set('');
     this.confirm.set('');
@@ -103,13 +125,14 @@ export class Login implements OnInit {
 
   async submit() {
     this.error.set('');
-    if (this.isNew() && this.password() !== this.confirm()) {
+    if (this.needsCode() && this.password() !== this.confirm()) {
       this.error.set('Les deux mots de passe ne sont pas identiques');
       return;
     }
     this.busy.set(true);
     try {
-      if (this.isNew()) await this.auth.register(this.name(), this.passcode(), this.password());
+      if (this.resetting()) await this.auth.resetPassword(this.name(), this.passcode(), this.password());
+      else if (this.isNew()) await this.auth.register(this.name(), this.passcode(), this.password());
       else await this.auth.login(this.name(), this.password());
       await this.router.navigateByUrl('/');
     } catch (e) {

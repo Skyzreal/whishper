@@ -22,6 +22,8 @@ export class Api {
     firstValueFrom(this.http.post<{ name: string }>('/api/login', { name, password }));
   register = (name: string, passcode: string, password: string) =>
     firstValueFrom(this.http.post<{ name: string }>('/api/register', { name, passcode, password }));
+  resetPassword = (name: string, passcode: string, password: string) =>
+    firstValueFrom(this.http.post<{ name: string }>('/api/reset-password', { name, passcode, password }));
   logout = () => firstValueFrom(this.http.post('/api/logout', {}));
 
   people = () => firstValueFrom(this.http.get<{ me: string; people: Person[] }>('/api/people'));
