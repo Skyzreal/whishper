@@ -47,6 +47,10 @@ import { Api, errorMessage } from '../api';
           <input name="note" maxlength="1000" placeholder="Taille, couleur, magasin…" [(ngModel)]="note" />
         </label>
       </div>
+      <label class="check">
+        <input type="checkbox" name="multi" [(ngModel)]="multi" />
+        Plusieurs personnes peuvent l'offrir <span class="hint">(carte-cadeau, par exemple)</span>
+      </label>
       @if (error()) {
         <p class="error" role="alert">{{ error() }}</p>
       }
@@ -66,6 +70,7 @@ export class AddItem {
   title = signal('');
   price = signal('');
   note = signal('');
+  multi = signal(false);
   image = signal('');
   fetching = signal(false);
   saving = signal(false);
@@ -113,7 +118,9 @@ export class AddItem {
         price: this.price().trim() || undefined,
         note: this.note().trim() || undefined,
         forName: this.forName() || undefined,
+        multi: this.multi() || undefined,
       });
+      this.multi.set(false);
       for (const s of [this.url, this.title, this.price, this.note, this.image, this.hint]) s.set('');
       this.fetchedFor = '';
       this.open.set(false);

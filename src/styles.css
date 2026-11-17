@@ -132,6 +132,10 @@ button.link:hover:not(:disabled) { background: none; }
 .body p { margin: 0.1rem 0; }
 .price { font-weight: 700; font-variant-numeric: tabular-nums; }
 .note { color: var(--muted); font-size: 0.95rem; overflow-wrap: anywhere; }
+.multi, .claimers { margin: 0; font-size: 0.9rem; color: var(--muted); }
+.claimers { color: var(--ok); }
+label.check { display: flex; align-items: center; gap: 0.5rem; font-weight: 400; }
+label.check input { width: auto; margin: 0; }
 .external { font-size: 0.9rem; color: var(--muted); }
 .actions { display: flex; flex-direction: column; gap: 0.4rem; align-items: stretch; }
 .badge { font-size: 0.9rem; font-weight: 600; text-align: center; padding: 0.15rem 0; }

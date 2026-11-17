@@ -10,6 +10,10 @@ export interface Item {
   /** Only present on other people's lists, never on your own. */
   claimed?: boolean;
   claimedByMe?: boolean;
+  /** Several people can reserve it. */
+  multi?: boolean;
+  /** Names of everyone who reserved a multi item (never filled for other items). */
+  claimers?: string[];
   /** Only on the reservations page: the owner took this item off their list. */
   removed?: boolean;
 }
@@ -36,6 +40,7 @@ export interface NewItem {
   image?: string;
   price?: string;
   note?: string;
+  multi?: boolean;
   /** Add to the list of someone whose list you manage, instead of your own. */
   forName?: string;
 }

@@ -80,7 +80,7 @@ describe('privacy: the owner never receives claim data', () => {
       expect(raw).not.toContain('claim');
       expect(raw).not.toContain('michaël');
       expect(Object.keys(res.body.items[0]).sort()).toEqual(
-        ['createdAt', 'id', 'image', 'note', 'owner', 'price', 'title', 'url'].sort(),
+        ['createdAt', 'id', 'image', 'multi', 'note', 'owner', 'price', 'title', 'url'].sort(),
       );
     }
   });
@@ -412,5 +412,78 @@ describe('managed lists (a child without an account)', () => {
     const log = await request(app).post('/api/login').send({ name: 'Orélie', password: PASSWORD });
     expect(log.status).toBe(403);
     expect((await request(app).get('/api/members')).body.members).not.toContain('Orélie');
+  });
+});
+
+describe('multi items (several people reserve the same gift, e.g. a gift card)', () => {
+  async function giftCard() {
+    const alice = as(await login('Stéphanie'));
+    const bob = as(await login('Michaël'));
+    const carol = as(await login('Nathaniel'));
+    const { body } = await alice.post('/api/items').send({ title: 'Carte-cadeau', multi: true });
+    return { alice, bob, carol, id: body.item.id as number };
+  }
+
+  it('lets several people reserve it and shows them each other, but never shows the owner', async () => {
+    const { alice, bob, carol, id } = await giftCard();
+    expect((await bob.post(`/api/items/${id}/claim`)).status).toBe(200);
+    expect((await carol.post(`/api/items/${id}/claim`)).status).toBe(200);
+
+    const seen = (await carol.get('/api/people/St%C3%A9phanie/items')).body.items[0];
+    expect(seen.claimers).toEqual(['Michaël', 'Nathaniel']);
+    expect(seen.claimed).toBe(false);
+    expect(seen.claimedByMe).toBe(true);
+
+    for (const url of ['/api/items', '/api/people', '/api/people/St%C3%A9phanie/items']) {
+      expect(JSON.stringify((await alice.get(url)).body), url).not.toMatch(/claim/i);
+    }
+    for (const url of ['/api/items', '/api/people/St%C3%A9phanie/items']) {
+      expect(JSON.stringify((await alice.get(url)).body), url).not.toMatch(/Michaël|Nathaniel/);
+    }
+    expect((await alice.get('/api/items')).body.items[0].multi).toBe(true);
+  });
+
+  it('only removes your own reservation, and the item stays for the others', async () => {
+    const { bob, carol, id } = await giftCard();
+    await bob.post(`/api/items/${id}/claim`);
+    await carol.post(`/api/items/${id}/claim`);
+    await bob.delete(`/api/items/${id}/claim`);
+    const seen = (await carol.get('/api/people/St%C3%A9phanie/items')).body.items[0];
+    expect(seen.claimers).toEqual(['Nathaniel']);
+    expect((await bob.get('/api/reservations')).body.items).toHaveLength(0);
+    expect((await carol.get('/api/reservations')).body.items).toHaveLength(1);
+  });
+
+  it('keeps single items exclusive and hides names on them', async () => {
+    const alice = as(await login('Stéphanie'));
+    const bob = as(await login('Michaël'));
+    const carol = as(await login('Nathaniel'));
+    const { body } = await alice.post('/api/items').send({ title: 'Socks' });
+    const id = body.item.id as number;
+    expect((await bob.post(`/api/items/${id}/claim`)).status).toBe(200);
+    expect((await bob.post(`/api/items/${id}/claim`)).status).toBe(200);
+    expect((await carol.post(`/api/items/${id}/claim`)).status).toBe(409);
+    const seen = (await carol.get('/api/people/St%C3%A9phanie/items')).body.items[0];
+    expect(seen).toMatchObject({ claimed: true, claimedByMe: false, claimers: [] });
+  });
+
+  it('upgrades a database whose claims table only allowed one claimer per item', async () => {
+    const url = `file:${join(dir, `old-${Date.now()}.db`)}`;
+    const old = createClient({ url });
+    await old.batch(
+      [
+        'CREATE TABLE items (id INTEGER PRIMARY KEY AUTOINCREMENT, owner TEXT NOT NULL, title TEXT NOT NULL, url TEXT, image TEXT, price TEXT, note TEXT, created_at TEXT NOT NULL DEFAULT (datetime()))',
+        'CREATE TABLE claims (item_id INTEGER PRIMARY KEY REFERENCES items (id) ON DELETE CASCADE, claimer TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime()))',
+        "INSERT INTO items (owner, title) VALUES ('Stéphanie', 'Socks')",
+        "INSERT INTO claims (item_id, claimer) VALUES (1, 'Michaël')",
+      ],
+      'write',
+    );
+    old.close();
+    const upgraded = await openDb(url);
+    opened.push(upgraded);
+    await upgraded.execute("UPDATE items SET multi = 1 WHERE id = 1");
+    await upgraded.execute("INSERT INTO claims (item_id, claimer) VALUES (1, 'Nathaniel')");
+    expect((await upgraded.execute('SELECT claimer FROM claims ORDER BY claimer')).rows.map((r) => r['claimer'])).toEqual(['Michaël', 'Nathaniel']);
   });
 });

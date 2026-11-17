@@ -21,6 +21,12 @@ import { Item } from '../models';
         @if (i.note) {
           <p class="note">{{ i.note }}</p>
         }
+        @if (i.multi) {
+          <p class="multi">Plusieurs personnes peuvent l'offrir</p>
+        }
+        @if (mode() === 'other' && i.claimers?.length) {
+          <p class="claimers">Déjà prévu par {{ i.claimers!.join(', ') }}</p>
+        }
         @if (i.url) {
           <a class="external" [href]="i.url" target="_blank" rel="noopener noreferrer">{{ host() }} ↗</a>
         }

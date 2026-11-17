@@ -9,13 +9,18 @@ export interface OwnItem {
   image: string | null;
   price: string | null;
   note: string | null;
+  /** Several people may each reserve it (e.g. a gift card), and they can see each other's names. */
+  multi: boolean;
   createdAt: string;
 }
 
 /** What someone else sees. The claimer's identity is never exposed, only whether it is them. */
 export interface OtherItem extends OwnItem {
+  /** Always false for multi items: they stay available. */
   claimed: boolean;
   claimedByMe: boolean;
+  /** Only filled for multi items, where reservers are meant to see each other. Always empty otherwise. */
+  claimers: string[];
 }
 
 export interface ItemInput {
@@ -24,6 +29,7 @@ export interface ItemInput {
   image?: string | null;
   price?: string | null;
   note?: string | null;
+  multi?: boolean;
 }
 
 export class HttpError extends Error {
@@ -44,6 +50,7 @@ function toOwnItem(row: Record<string, unknown>): OwnItem {
     image: (row['image'] as string | null) ?? null,
     price: (row['price'] as string | null) ?? null,
     note: (row['note'] as string | null) ?? null,
+    multi: Number(row['multi']) === 1,
     createdAt: String(row['created_at']),
   };
 }
@@ -60,23 +67,34 @@ export async function getListForViewer(
 ): Promise<OwnItem[] | OtherItem[]> {
   if (viewer === owner) {
     const res = await db.execute({
-      sql: 'SELECT id, owner, title, url, image, price, note, created_at FROM items WHERE owner = ? AND deleted_at IS NULL ORDER BY id DESC',
+      sql: 'SELECT id, owner, title, url, image, price, note, multi, created_at FROM items WHERE owner = ? AND deleted_at IS NULL ORDER BY id DESC',
       args: [owner],
     });
     return res.rows.map((r) => toOwnItem(r as unknown as Record<string, unknown>));
   }
 
   const res = await db.execute({
-    sql: `SELECT i.id, i.owner, i.title, i.url, i.image, i.price, i.note, i.created_at, c.claimer AS claimer
+    sql: `SELECT i.id, i.owner, i.title, i.url, i.image, i.price, i.note, i.multi, i.created_at, c.claimer AS claimer
           FROM items i LEFT JOIN claims c ON c.item_id = i.id
-          WHERE i.owner = ? AND i.deleted_at IS NULL ORDER BY i.id DESC`,
+          WHERE i.owner = ? AND i.deleted_at IS NULL ORDER BY i.id DESC, c.created_at, c.claimer`,
     args: [owner],
   });
-  return res.rows.map((r) => {
+  const byId = new Map<number, OtherItem>();
+  for (const r of res.rows) {
     const row = r as unknown as Record<string, unknown>;
     const claimer = (row['claimer'] as string | null) ?? null;
-    return { ...toOwnItem(row), claimed: claimer !== null, claimedByMe: claimer === viewer };
-  });
+    const base = toOwnItem(row);
+    let item = byId.get(base.id);
+    if (!item) {
+      item = { ...base, claimed: false, claimedByMe: false, claimers: [] };
+      byId.set(base.id, item);
+    }
+    if (claimer === null) continue;
+    if (claimer === viewer) item.claimedByMe = true;
+    if (base.multi) item.claimers.push(claimer);
+    else item.claimed = true;
+  }
+  return [...byId.values()];
 }
 
 export async function countItemsByOwner(db: Client): Promise<Map<string, number>> {
@@ -86,9 +104,9 @@ export async function countItemsByOwner(db: Client): Promise<Map<string, number>
 
 export async function addItem(db: Client, owner: string, input: ItemInput): Promise<OwnItem> {
   const res = await db.execute({
-    sql: `INSERT INTO items (owner, title, url, image, price, note) VALUES (?, ?, ?, ?, ?, ?)
-          RETURNING id, owner, title, url, image, price, note, created_at`,
-    args: [owner, input.title, input.url ?? null, input.image ?? null, input.price ?? null, input.note ?? null],
+    sql: `INSERT INTO items (owner, title, url, image, price, note, multi) VALUES (?, ?, ?, ?, ?, ?, ?)
+          RETURNING id, owner, title, url, image, price, note, multi, created_at`,
+    args: [owner, input.title, input.url ?? null, input.image ?? null, input.price ?? null, input.note ?? null, input.multi ? 1 : 0],
   });
   return toOwnItem(res.rows[0] as unknown as Record<string, unknown>);
 }
@@ -123,20 +141,24 @@ export async function deleteOwnItem(db: Client, owners: string[], itemId: number
 }
 
 export async function claimItem(db: Client, viewer: string, itemId: number, managedByViewer: string[] = []): Promise<void> {
-  const item = await db.execute({ sql: 'SELECT owner FROM items WHERE id = ? AND deleted_at IS NULL', args: [itemId] });
+  const item = await db.execute({ sql: 'SELECT owner, multi FROM items WHERE id = ? AND deleted_at IS NULL', args: [itemId] });
   if (!item.rows.length) throw new HttpError(404, 'Cadeau introuvable');
   const owner = String(item.rows[0]['owner']);
   if (owner === viewer) throw new HttpError(403, 'Tu ne peux pas réserver un cadeau de ta propre liste');
   // A manager gets the owner view of the list, so they must not be able to claim (and thereby see claims).
   if (managedByViewer.includes(owner)) throw new HttpError(403, 'Tu gères cette liste : tu ne peux pas y réserver de cadeau');
 
+  // Single-claimer items are claimed atomically; multi items let everyone add their own claim.
+  const multi = Number(item.rows[0]['multi']) === 1;
   const ins = await db.execute({
-    sql: 'INSERT OR IGNORE INTO claims (item_id, claimer) VALUES (?, ?)',
-    args: [itemId, viewer],
+    sql: multi
+      ? 'INSERT OR IGNORE INTO claims (item_id, claimer) VALUES (?, ?)'
+      : 'INSERT INTO claims (item_id, claimer) SELECT ?, ? WHERE NOT EXISTS (SELECT 1 FROM claims WHERE item_id = ?)',
+    args: multi ? [itemId, viewer] : [itemId, viewer, itemId],
   });
-  if (ins.rowsAffected === 0) {
-    const existing = await db.execute({ sql: 'SELECT claimer FROM claims WHERE item_id = ?', args: [itemId] });
-    if (existing.rows[0]?.['claimer'] !== viewer) throw new HttpError(409, "Quelqu'un a déjà réservé ce cadeau");
+  if (ins.rowsAffected === 0 && !multi) {
+    const existing = await db.execute({ sql: 'SELECT 1 FROM claims WHERE item_id = ? AND claimer = ?', args: [itemId, viewer] });
+    if (!existing.rows.length) throw new HttpError(409, "Quelqu'un a déjà réservé ce cadeau");
   }
 }
 
@@ -158,7 +180,7 @@ export interface Reservation extends OwnItem {
 
 export async function listReservations(db: Client, viewer: string): Promise<Reservation[]> {
   const res = await db.execute({
-    sql: `SELECT i.id, i.owner, i.title, i.url, i.image, i.price, i.note, i.created_at, i.deleted_at
+    sql: `SELECT i.id, i.owner, i.title, i.url, i.image, i.price, i.note, i.multi, i.created_at, i.deleted_at
           FROM claims c JOIN items i ON i.id = c.item_id
           WHERE c.claimer = ? ORDER BY i.owner, i.id DESC`,
     args: [viewer],

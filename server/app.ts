@@ -228,6 +228,7 @@ export function createApp({ config, getDb, fetchPreview = defaultFetchPreview }:
       image: webUrl(body.image, "L'image"),
       price: text(body.price, 50, 'Le prix'),
       note: text(body.note, 1000, 'La note'),
+      multi: body.multi === true,
     });
     res.status(201).json({ item });
   });

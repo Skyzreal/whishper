@@ -58,4 +58,17 @@ describe('ItemCard', () => {
     const el = render({ ...base, removed: false }, 'reservation');
     expect(el.textContent).toContain("Tu t'en occupes");
     expect(el.textContent).not.toContain('Retiré');
+  });
+
+  it('keeps a multi item available to others and names who is already on it', () => {
+    const el = render({ ...base, multi: true, claimed: false, claimedByMe: false, claimers: ['Jade', 'Marie'] }, 'other');
+    expect(el.querySelector('.card.taken')).toBeNull();
+    expect(el.textContent).toContain('Jade, Marie');
+    expect(el.querySelector('button')?.textContent).toContain("Je m'en occupe");
+  });
+
+  it('shows a multi item to its owner without any names', () => {
+    const el = render({ ...base, multi: true }, 'own');
+    expect(el.textContent).toContain("Plusieurs personnes peuvent l'offrir");
+    expect(el.textContent).not.toMatch(/prévu par/);
   });});

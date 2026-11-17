@@ -38,6 +38,11 @@ Côté technique : s'il y a une réservation, deleteOwnItem ne supprime pas la l
 > Remarque : la personne qui a accès au tableau de bord de l'hébergement ou à la base de données peut évidemment lire la table `claims`.
 > La règle de confidentialité protège les membres de la famille qui utilisent l'application, pas la personne qui l'administre.
 
+### Cadeaux que plusieurs personnes peuvent offrir
+
+Pour une carte-cadeau, par exemple, coche **« Plusieurs personnes peuvent l'offrir »** en l'ajoutant. Cet élément reste disponible : chacun peut cliquer sur **« Je m'en occupe »**, et les autres membres de la famille voient **qui** y participe (« Déjà prévu par Jade, Marie »). La personne concernée, elle, ne voit toujours rien : la liste qu'elle reçoit contient seulement l'indication que le cadeau est partageable, jamais de réservation ni de nom.
+Les cadeaux ordinaires restent à un seul preneur, et on n'y voit jamais le nom de la personne. Il faut cocher l'option à l'ajout : pour changer un cadeau existant, retire-le et ajoute-le de nouveau. Les bases de données existantes sont mises à jour automatiquement au démarrage.
+
 ### Gérer la liste d'un enfant
 
 Avec `MANAGED_MEMBERS=Orélie:François`, Orélie n'a pas de compte : François va sur sa fiche dans **Famille** et peut y **ajouter** et **retirer** des idées à sa place. Le prénom d'Orélie n'apparaît plus sur la page de connexion, et la connexion à son nom est refusée.
