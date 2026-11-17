@@ -22,6 +22,8 @@ export interface Preview {
   image: string | null;
   price: string | null;
   url: string;
+  /** True when the page gave no real title (blocked or generic), so the user should check the fields. */
+  partial: boolean;
 }
 
 export interface NewItem {

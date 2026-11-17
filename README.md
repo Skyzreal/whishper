@@ -1,126 +1,138 @@
 # 🎁 Whishper
 
-A private family gift-exchange wishlist, built for a family that wants to **give gifts without drawing names**
-(no Pikaddo-style random assignment) and **without a group chat full of "I bought this" messages**.
+Une liste de souhaits familiale et privée, pour une famille qui veut **offrir des cadeaux sans tirage au sort**
+(pas de style Pikaddo avec une personne assignée au hasard) et **sans clavardage de groupe rempli de « j'ai acheté ça »**.
 
-- Everyone has their own clearly labelled list. Browse any family member's list from the **Family** page.
-- Add items from anywhere: paste a product link (title, picture and price are fetched automatically when the
-  shop allows it) or just write something out, like *"Gift card – any store, ~$50"*.
-- **Claim items Amazon-style.** Click **"I'll get this"** on someone else's item. Everyone else sees it greyed out as
-  *Already taken*, so nobody double-buys, and you can **Undo** it any time.
-- **The list owner never finds out.** They never see which items are claimed, or by whom, so gifts stay a surprise.
-  Nobody (not even other family members) can see *who* claimed an item. Only you can see that an item is yours.
+L'application est entièrement en français. Les prénoms de la famille se configurent dans `FAMILY_MEMBERS`.
 
-## How privacy works
+- Chaque personne a sa propre liste, clairement identifiée. Tu peux consulter la liste de chacun depuis la page **Famille**.
+- Ajoute des cadeaux d'où tu veux : colle un lien de produit (le titre, l'image et le prix sont récupérés automatiquement
+  quand la boutique le permet) ou écris simplement ce que tu veux, par exemple *« Carte-cadeau – n'importe quel magasin, environ 50 $ »*.
+- **Réserve des cadeaux à la Amazon.** Clique sur **« Je m'en occupe »** sur le cadeau de quelqu'un d'autre. Tout le monde
+  le voit alors grisé avec la mention *Déjà réservé*, donc personne n'achète en double, et tu peux **Annuler** en tout temps.
+- **La personne concernée ne le saura jamais.** Elle ne voit jamais quels cadeaux sont réservés, ni par qui, pour que la surprise reste entière.
+  Personne (même pas les autres membres de la famille) ne peut voir *qui* a réservé un cadeau. Seul toi sais que c'est le tien.
 
-Claim data is kept in a separate `claims` table, and there is one function that decides what each viewer may see:
-`getListForViewer` in [`server/items.ts`](server/items.ts).
+## Comment la confidentialité fonctionne
 
-| Viewer | Sees |
+Les réservations sont stockées dans une table `claims` séparée, et une seule fonction décide de ce que chacun peut voir :
+`getListForViewer` dans [`server/items.ts`](server/items.ts).
+
+| Qui regarde | Ce qu'il voit |
 | --- | --- |
-| The list's owner | Items only. The response contains **no** claim fields at all, and the claims table isn't even queried. |
-| Another family member | Each item plus `claimed` (true/false) and `claimedByMe`. The claimer's name is never sent to anyone. |
+| Le propriétaire de la liste | Seulement les cadeaux. La réponse ne contient **aucun** champ lié aux réservations, et la table des réservations n'est même pas interrogée. |
+| Un autre membre de la famille | Chaque cadeau, plus `claimed` (vrai/faux) et `claimedByMe`. Le nom de la personne qui a réservé n'est jamais envoyé à qui que ce soit. |
 
-Other guarantees, all covered by tests in [`server/app.test.ts`](server/app.test.ts):
+Autres garanties, toutes couvertes par les tests de [`server/app.test.ts`](server/app.test.ts) :
 
-- An owner's list looks identical before and after something is claimed or unclaimed.
-- Owners can't claim their own items, and trying to unclaim reveals nothing (the response is always the same).
-- Only the claimer can undo a claim. Deleting an item silently deletes its claim.
+- La liste d'un propriétaire est identique avant et après qu'un cadeau soit réservé ou annulé.
+- Un propriétaire ne peut pas réserver ses propres cadeaux, et tenter d'annuler ne révèle rien (la réponse est toujours la même).
+- Seule la personne qui a réservé peut annuler sa réservation. Supprimer un cadeau supprime silencieusement sa réservation.
 
-> Note: whoever has access to your hosting dashboard or database can of course read the `claims` table.
-> The privacy rule protects family members using the app, not the person administering it.
+> Remarque : la personne qui a accès au tableau de bord de l'hébergement ou à la base de données peut évidemment lire la table `claims`.
+> La règle de confidentialité protège les membres de la famille qui utilisent l'application, pas la personne qui l'administre.
 
-## Tech stack
+## Technologies
 
-- **Frontend:** [Angular](https://angular.dev) (standalone components, signals, zoneless), static SPA.
-- **API:** small [Express](https://expressjs.com) + TypeScript app in [`server/`](server). On Vercel it runs as a single serverless
-  function ([`api/index.ts`](api/index.ts)); anywhere else it's a plain Node server.
-- **Database:** [libSQL](https://github.com/tursodatabase/libsql) (SQLite). A local file in development, a free
-  [Turso](https://turso.tech) database in production. The schema is created automatically.
-- **Sign-in:** pick your name from the family list + one shared passcode. A signed, HttpOnly cookie remembers you for 30 days.
-- **Tests:** [Vitest](https://vitest.dev) (API with supertest, plus Angular component tests).
+- **Interface :** [Angular](https://angular.dev) (composants autonomes, signaux, sans zone), application monopage statique.
+- **API :** petite application [Express](https://expressjs.com) + TypeScript dans [`server/`](server). Sur Vercel, elle tourne comme une seule
+  fonction serverless ([`api/index.ts`](api/index.ts)) ; ailleurs, c'est un simple serveur Node.
+- **Base de données :** [libSQL](https://github.com/tursodatabase/libsql) (SQLite). Un fichier local en développement, une base
+  [Turso](https://turso.tech) gratuite en production. Le schéma est créé automatiquement.
+- **Connexion :** choisis ton prénom dans la liste de la famille + un code secret partagé. Un cookie signé et `HttpOnly` te garde connecté 30 jours.
+- **Prénoms :** la connexion ignore les accents, les majuscules et la forme Unicode (`stephanie`, `STÉPHANIE` et `Stéphanie` donnent le même résultat).
+- **Tests :** [Vitest](https://vitest.dev) (API avec supertest, plus tests des composants Angular).
 
-## Quick start (local)
+## Démarrage rapide (local)
 
-Requires Node.js 22 or newer.
+Nécessite Node.js 22 ou plus récent.
 
 ```bash
 npm install
-cp .env.example .env        # then edit it (see below)
-npm run dev                 # API on :3000, Angular on http://localhost:4200
+cp .env.example .env        # puis modifie-le (voir ci-dessous)
+npm run dev                 # API sur :3000, Angular sur http://localhost:4200
 ```
 
-Open <http://localhost:4200>, choose your name and enter the passcode from `.env`.
-The local database is created at `data/whishper.db`.
+Sous Windows PowerShell, utilise `Copy-Item .env.example .env`.
 
-### Environment variables
+Ouvre <http://localhost:4200>, choisis ton prénom et entre le code secret de ton fichier `.env`.
+La base de données locale est créée dans `data/whishper.db`.
 
-| Variable | Required | Description |
+### Variables d'environnement
+
+| Variable | Requise | Description |
 | --- | --- | --- |
-| `FAMILY_MEMBERS` | yes | Comma-separated names, at least two (e.g. `Alice,Bob,Carol`). Names are case-insensitive when signing in. Renaming someone orphans their existing items. |
-| `FAMILY_PASSCODE` | yes | Shared passcode everyone enters to sign in. |
-| `SESSION_SECRET` | yes | Random string (16+ chars) used to sign cookies. Changing it signs everybody out. |
-| `TURSO_DATABASE_URL` | production | e.g. `libsql://your-db-org.turso.io`. Defaults to the local file `file:data/whishper.db`. |
-| `TURSO_AUTH_TOKEN` | production | Token for the Turso database. |
-| `PORT` | no | Port for `npm start` (default `3000`). |
+| `FAMILY_MEMBERS` | oui | Prénoms séparés par des virgules, au moins deux (p. ex. `Stéphanie,Michaël,Jade`). Les accents et les majuscules sont ignorés à la connexion. Renommer quelqu'un rend ses cadeaux existants orphelins. |
+| `FAMILY_PASSCODE` | oui | Code secret partagé que tout le monde entre pour se connecter. |
+| `SESSION_SECRET` | oui | Chaîne aléatoire (16 caractères ou plus) servant à signer les cookies. La changer déconnecte tout le monde. |
+| `TURSO_DATABASE_URL` | production | p. ex. `libsql://your-db-org.turso.io`. Par défaut, le fichier local `file:data/whishper.db`. |
+| `TURSO_AUTH_TOKEN` | production | Jeton de la base Turso. |
+| `PORT` | non | Port pour `npm start` (`3000` par défaut). |
 
 ### Scripts
 
-| Command | What it does |
+| Commande | Ce qu'elle fait |
 | --- | --- |
-| `npm run dev` | API (watch mode) + Angular dev server with `/api` proxied |
-| `npm test` | API tests, then Angular tests |
-| `npm run test:api` / `npm run test:web` | Run just one of them |
-| `npm run typecheck` | Type-check the API |
-| `npm run build` | Production build of the Angular app into `dist/whishper/browser` |
-| `npm start` | Serve the API **and** the built app from one Node process (self-hosting) |
+| `npm run dev` | API (mode surveillance) + serveur de développement Angular avec `/api` relayé |
+| `npm test` | Tests de l'API, puis tests Angular |
+| `npm run test:api` / `npm run test:web` | Lance seulement l'un des deux |
+| `npm run typecheck` | Vérifie les types de l'API |
+| `npm run build` | Build de production de l'application Angular dans `dist/whishper/browser` |
+| `npm start` | Sert l'API **et** l'application compilée depuis un seul processus Node (auto-hébergement) |
 
-### Troubleshooting
+### Dépannage
 
-- In development, open the app at **http://localhost:4200**. Port 3000 is the API only (it shows a short hint at `/`).
-- If `npm run dev` fails because port 3000 or 4200 is already in use, stop the other process first; `npm run dev` stops both halves if either one fails to start.
+- En développement, ouvre l'application sur **http://localhost:4200**. Le port 3000 est réservé à l'API (il affiche un court message à `/`).
+- Si `npm run dev` échoue parce que le port 3000 ou 4200 est déjà utilisé, arrête l'autre processus d'abord ; `npm run dev` arrête les deux moitiés si l'une ne démarre pas.
+- Après avoir changé `FAMILY_MEMBERS` dans `.env`, redémarre `npm run dev`.
 
-## Deploy for free (Vercel + Turso)
+## Déploiement gratuit (Vercel + Turso)
 
-1. **Create the database** at [turso.tech](https://turso.tech) (free tier):
+1. **Crée la base de données** sur [turso.tech](https://turso.tech) (forfait gratuit) :
    ```bash
    turso db create whishper
    turso db show whishper --url          # -> TURSO_DATABASE_URL
    turso db tokens create whishper       # -> TURSO_AUTH_TOKEN
    ```
-2. **Import the repo** in [Vercel](https://vercel.com/new). [`vercel.json`](vercel.json) already sets the build command,
-   output directory and routing. Vercel picks up `api/index.ts` as the serverless function.
-3. **Add environment variables** in *Project → Settings → Environment Variables*:
+2. **Importe le dépôt** dans [Vercel](https://vercel.com/new). [`vercel.json`](vercel.json) configure déjà la commande de build,
+   le dossier de sortie et le routage. Vercel détecte `api/index.ts` comme fonction serverless.
+3. **Ajoute les variables d'environnement** dans *Project → Settings → Environment Variables* :
    `FAMILY_MEMBERS`, `FAMILY_PASSCODE`, `SESSION_SECRET`, `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`.
-4. **Deploy.** Share the URL and the passcode with your family. 🎉
+4. **Déploie.** Partage l'adresse et le code secret avec ta famille. 🎉
 
-> Vercel's filesystem is read-only/ephemeral, so you must use Turso (not the local SQLite file) in production.
+> Le système de fichiers de Vercel est en lecture seule et éphémère : tu dois donc utiliser Turso (pas le fichier SQLite local) en production.
 
-### Other hosts
+### Autres hébergeurs
 
-Anything that runs Node works (a VPS, Raspberry Pi, Fly.io, Render…): set the environment variables,
-run `npm ci && npm run build && npm start`, and put it behind HTTPS. With `NODE_ENV=production` cookies are marked `Secure`.
-Mount a persistent volume for `data/` or point `TURSO_DATABASE_URL` at Turso.
+Tout ce qui exécute Node fonctionne (un VPS, un Raspberry Pi, Fly.io, Render…) : définis les variables d'environnement,
+lance `npm ci && npm run build && npm start`, et place le tout derrière HTTPS. Avec `NODE_ENV=production`, les cookies sont marqués `Secure`.
+Monte un volume persistant pour `data/` ou pointe `TURSO_DATABASE_URL` vers Turso.
 
-## Using it
+## Utilisation
 
-1. **Sign in** with your name and the family passcode.
-2. **My list:** add items (paste a link, optionally edit the fetched title/price, or describe something like a gift card). Remove items any time.
-3. **Family:** open someone's list and click **I'll get this** on what you plan to buy. Change your mind? Click **Undo**.
+1. **Connecte-toi** avec ton prénom et le code secret de la famille.
+2. **Ma liste :** ajoute des cadeaux (colle un lien, modifie au besoin le titre ou le prix récupérés, ou décris quelque chose comme une carte-cadeau). Retire-les en tout temps.
+3. **Famille :** ouvre la liste de quelqu'un et clique sur **Je m'en occupe** pour ce que tu comptes acheter. Tu changes d'idée ? Clique sur **Annuler**.
 
-Some shops (Amazon, for instance) block automated link previews. When that happens, the link is still saved and you can
-type the title and price yourself.
+### Aperçu des liens
 
-## Project layout
+Quand tu colles un lien, le serveur lit la page comme le ferait un navigateur ordinaire (titre, image, prix). Certaines boutiques,
+Amazon surtout, affichent une page de vérification anti-robot au lieu du produit. Dans ce cas :
+
+- les titres génériques (« Amazon », « Robot Check »…) et les logos du site sont ignorés, jamais préremplis ;
+- pour Amazon, le nom du produit est déduit de l'adresse du lien quand c'est possible ;
+- un petit message t'invite à vérifier le nom et à ajouter le prix ou une note toi-même. Le lien est quand même enregistré.
+
+## Structure du projet
 
 ```
-server/   Express API: items.ts (privacy rules), session.ts, scrape.ts (link previews + SSRF guard), app.ts
-api/      Vercel serverless entry point
-src/app/  Angular app (pages/, components/, api.ts, auth.ts)
+server/   API Express : items.ts (règles de confidentialité), session.ts, scrape.ts (aperçu des liens + protection SSRF), app.ts
+api/      Point d'entrée serverless pour Vercel
+src/app/  Application Angular (pages/, components/, api.ts, auth.ts)
 ```
 
-## Security notes
+## Sécurité
 
-- Link previews are fetched server-side with a timeout, a size cap, and a guard that refuses private/loopback addresses.
-- Cross-site writes are rejected (`SameSite=Lax` cookie plus an `Origin` check), and login attempts are rate-limited per IP (best effort on serverless).
-- The sign-in screen lists family names (so people can pick theirs) but nothing else is available without the passcode.
+- Les aperçus de liens sont récupérés côté serveur avec un délai maximal, une taille maximale et une protection qui refuse les adresses privées ou locales.
+- Les écritures inter-sites sont refusées (cookie `SameSite=Lax` plus vérification de l'en-tête `Origin`), et les tentatives de connexion sont limitées par adresse IP (au mieux en mode serverless).
+- L'écran de connexion affiche les prénoms de la famille (pour que chacun trouve le sien), mais rien d'autre n'est accessible sans le code secret.

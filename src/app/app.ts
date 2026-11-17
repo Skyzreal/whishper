@@ -11,13 +11,13 @@ import { Avatar } from './components/avatar';
       <a routerLink="/" class="brand">🎁 Whishper</a>
       @if (auth.user(); as me) {
         <nav>
-          <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">My list</a>
-          <a routerLink="/people" routerLinkActive="active">Family</a>
+          <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }"          >Ma liste</a>
+                    <a routerLink="/people" routerLinkActive="active">Famille</a>
         </nav>
         <div class="me">
           <app-avatar [name]="me" [size]="28" />
           <span class="me-name">{{ me }}</span>
-          <button class="link" type="button" (click)="logout()">Sign out</button>
+          <button class="link" type="button" (click)="logout()">Se déconnecter</button>
         </div>
       }
     </header>

@@ -1,6 +1,6 @@
 import express, { type NextFunction, type Request, type RequestHandler, type Response } from 'express';
 import type { Client } from '@libsql/client';
-import type { Config } from './config';
+import { findMember, type Config } from './config';
 import {
   HttpError,
   addItem,
@@ -30,16 +30,16 @@ type AuthedRequest = Request & { user: string };
 
 function text(value: unknown, max: number, field: string, required = false): string | null {
   if (value === undefined || value === null || value === '') {
-    if (required) throw new HttpError(400, `${field} is required`);
+    if (required) throw new HttpError(400, `${field} est requis`);
     return null;
   }
-  if (typeof value !== 'string') throw new HttpError(400, `${field} must be text`);
+  if (typeof value !== 'string') throw new HttpError(400, `${field} doit être du texte`);
   const v = value.trim();
   if (!v) {
-    if (required) throw new HttpError(400, `${field} is required`);
+    if (required) throw new HttpError(400, `${field} est requis`);
     return null;
   }
-  if (v.length > max) throw new HttpError(400, `${field} is too long (max ${max} characters)`);
+  if (v.length > max) throw new HttpError(400, `${field} dépasse la limite de ${max} caractères`);
   return v;
 }
 
@@ -52,12 +52,12 @@ function webUrl(value: unknown, field: string): string | null {
   } catch {
     /* fall through */
   }
-  throw new HttpError(400, `${field} must be a valid http(s) link`);
+  throw new HttpError(400, `${field} doit être un lien http(s) valide`);
 }
 
 function itemId(req: Request): number {
   const id = Number(req.params['id']);
-  if (!Number.isSafeInteger(id) || id < 1) throw new HttpError(400, 'Invalid item id');
+  if (!Number.isSafeInteger(id) || id < 1) throw new HttpError(400, 'Identifiant de cadeau invalide');
   return id;
 }
 
@@ -84,7 +84,7 @@ export function createApp({ config, getDb, fetchPreview = defaultFetchPreview }:
       } catch {
         /* invalid */
       }
-      if (originHost !== host) return next(new HttpError(403, 'Cross-site request blocked'));
+      if (originHost !== host) return next(new HttpError(403, 'Requête inter-sites bloquée'));
     }
     next();
   });
@@ -101,15 +101,14 @@ export function createApp({ config, getDb, fetchPreview = defaultFetchPreview }:
     const now = Date.now();
     const rec = attempts.get(ip);
     if (rec && rec.resetAt > now && rec.count >= MAX_ATTEMPTS) {
-      throw new HttpError(429, 'Too many attempts, try again later');
+      throw new HttpError(429, 'Trop de tentatives, réessaie plus tard');
     }
 
-    const name = typeof req.body?.name === 'string' ? req.body.name.trim().toLowerCase() : '';
-    const member = config.members.find((m) => m.toLowerCase() === name);
+    const member = findMember(config.members, req.body?.name);
     // Same failure for unknown names and wrong passcodes.
     if (!member || !checkPasscode(req.body?.passcode, config.passcode)) {
       attempts.set(ip, rec && rec.resetAt > now ? { ...rec, count: rec.count + 1 } : { count: 1, resetAt: now + WINDOW_MS });
-      throw new HttpError(401, 'Wrong name or passcode');
+      throw new HttpError(401, 'Prénom ou code secret incorrect');
     }
     attempts.delete(ip);
     const token = createSessionToken(member, config.sessionSecret);
@@ -125,7 +124,7 @@ export function createApp({ config, getDb, fetchPreview = defaultFetchPreview }:
   const requireUser: RequestHandler = (req, _res, next) => {
     const token = parseCookies(req.headers.cookie)[COOKIE_NAME];
     const user = verifySessionToken(token, config.sessionSecret, config.members);
-    if (!user) return next(new HttpError(401, 'Please sign in'));
+    if (!user) return next(new HttpError(401, 'Connecte-toi pour continuer'));
     (req as AuthedRequest).user = user;
     next();
   };
@@ -148,9 +147,8 @@ export function createApp({ config, getDb, fetchPreview = defaultFetchPreview }:
 
   api.get('/people/:name/items', requireUser, async (req, res) => {
     const viewer = (req as AuthedRequest).user;
-    const wanted = String(req.params['name']).toLowerCase();
-    const owner = config.members.find((m) => m.toLowerCase() === wanted);
-    if (!owner) throw new HttpError(404, 'Person not found');
+    const owner = findMember(config.members, req.params['name']);
+    if (!owner) throw new HttpError(404, 'Personne introuvable');
     const items = await getListForViewer(await getDb(), viewer, owner);
     res.json({ owner, isMe: owner === viewer, items });
   });
@@ -164,27 +162,27 @@ export function createApp({ config, getDb, fetchPreview = defaultFetchPreview }:
     const me = (req as AuthedRequest).user;
     const body = req.body ?? {};
     const item = await addItem(await getDb(), me, {
-      title: text(body.title, 200, 'Title', true)!,
-      url: webUrl(body.url, 'Link'),
-      image: webUrl(body.image, 'Image'),
-      price: text(body.price, 50, 'Price'),
-      note: text(body.note, 1000, 'Note'),
+      title: text(body.title, 200, 'Le titre', true)!,
+      url: webUrl(body.url, 'Le lien'),
+      image: webUrl(body.image, "L'image"),
+      price: text(body.price, 50, 'Le prix'),
+      note: text(body.note, 1000, 'La note'),
     });
     res.status(201).json({ item });
   });
 
   api.delete('/items/:id', requireUser, async (req, res) => {
     const removed = await deleteOwnItem(await getDb(), (req as AuthedRequest).user, itemId(req));
-    if (!removed) throw new HttpError(404, 'Item not found');
+    if (!removed) throw new HttpError(404, 'Cadeau introuvable');
     res.json({ ok: true });
   });
 
   api.post('/preview', requireUser, async (req, res) => {
-    const url = text(req.body?.url, 2000, 'Link', true)!;
+    const url = text(req.body?.url, 2000, 'Le lien', true)!;
     try {
       res.json(await fetchPreview(url));
     } catch (e) {
-      throw new HttpError(400, e instanceof Error ? e.message : 'Could not read that link');
+      throw new HttpError(400, e instanceof Error ? e.message : 'Impossible de lire ce lien');
     }
   });
 
@@ -198,16 +196,16 @@ export function createApp({ config, getDb, fetchPreview = defaultFetchPreview }:
     res.json({ ok: true });
   });
 
-  api.use((_req, _res, next) => next(new HttpError(404, 'Not found')));
+  api.use((_req, _res, next) => next(new HttpError(404, 'Introuvable')));
 
   api.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     if (err instanceof HttpError) {
       res.status(err.status).json({ error: err.message });
     } else if ((err as { type?: string })?.type === 'entity.parse.failed') {
-      res.status(400).json({ error: 'Invalid JSON' });
+      res.status(400).json({ error: 'JSON invalide' });
     } else {
       console.error(err);
-      res.status(500).json({ error: 'Something went wrong' });
+      res.status(500).json({ error: 'Une erreur est survenue' });
     }
   });
 

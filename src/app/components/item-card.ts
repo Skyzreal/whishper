@@ -27,14 +27,14 @@ import { Item } from '../models';
       </div>
       <div class="actions">
         @if (mode() === 'own') {
-          <button type="button" class="danger" (click)="remove.emit(i)">Remove</button>
+          <button type="button" class="danger" (click)="remove.emit(i)"          >Retirer</button>
         } @else if (i.claimedByMe) {
-          <span class="badge mine">✓ You're getting this</span>
-          <button type="button" class="secondary" (click)="unclaim.emit(i)">Undo</button>
+                    <span class="badge mine">✓ Tu t'en occupes</span>
+                    <button type="button" class="secondary" (click)="unclaim.emit(i)">Annuler</button>
         } @else if (i.claimed) {
-          <span class="badge taken">Already taken</span>
+                    <span class="badge taken">Déjà réservé</span>
         } @else {
-          <button type="button" (click)="claim.emit(i)">I'll get this</button>
+                    <button type="button" (click)="claim.emit(i)">Je m'en occupe</button>
         }
       </div>
     </article>
@@ -53,7 +53,7 @@ export class ItemCard {
     try {
       return new URL(this.item().url ?? '').hostname.replace(/^www\./, '');
     } catch {
-      return 'Open link';
+      return 'Ouvrir le lien';
     }
   });
 }

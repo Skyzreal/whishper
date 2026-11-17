@@ -9,7 +9,7 @@ import type { Config } from './config';
 import { openDb } from './db';
 
 const config: Config = {
-  members: ['Alice', 'Bob', 'Carol'],
+  members: ['Stéphanie', 'Michaël', 'Nathaniel'],
   passcode: 'family-secret',
   sessionSecret: 'test-secret-test-secret',
   databaseUrl: '',
@@ -28,7 +28,7 @@ beforeEach(async () => {
   app = createApp({
     config,
     getDb: async () => db,
-    fetchPreview: async (url) => ({ title: 'Preview', image: null, price: null, url }),
+    fetchPreview: async (url) => ({ title: 'Preview', image: null, price: null, url, partial: false }),
   });
 });
 
@@ -54,26 +54,26 @@ const as = (cookie: string) => ({
 });
 
 async function aliceWithClaimedItem() {
-  const alice = as(await login('Alice'));
-  const bob = as(await login('Bob'));
+  const alice = as(await login('Stéphanie'));
+  const bob = as(await login('Michaël'));
   const created = await alice.post('/api/items').send({ title: 'Cozy socks', url: 'https://example.com/socks' });
   const id = created.body.item.id as number;
   expect((await bob.post(`/api/items/${id}/claim`)).status).toBe(200);
-  return { alice, bob, carol: as(await login('Carol')), id };
+  return { alice, bob, carol: as(await login('Nathaniel')), id };
 }
 
 describe('privacy: the owner never receives claim data', () => {
   it('own list responses contain no claim information, even when items are claimed', async () => {
     const { alice, id } = await aliceWithClaimedItem();
 
-    for (const url of ['/api/items', '/api/people/Alice/items', '/api/people/alice/items']) {
+    for (const url of ['/api/items', '/api/people/St%C3%A9phanie/items', '/api/people/stephanie/items']) {
       const res = await alice.get(url);
       expect(res.status).toBe(200);
       expect(res.body.items).toHaveLength(1);
       expect(res.body.items[0].id).toBe(id);
       const raw = JSON.stringify(res.body).toLowerCase();
       expect(raw).not.toContain('claim');
-      expect(raw).not.toContain('bob');
+      expect(raw).not.toContain('michaël');
       expect(Object.keys(res.body.items[0]).sort()).toEqual(
         ['createdAt', 'id', 'image', 'note', 'owner', 'price', 'title', 'url'].sort(),
       );
@@ -81,8 +81,8 @@ describe('privacy: the owner never receives claim data', () => {
   });
 
   it('the people overview is unchanged by claims and exposes no claim information', async () => {
-    const alice = as(await login('Alice'));
-    const bob = as(await login('Bob'));
+    const alice = as(await login('Stéphanie'));
+    const bob = as(await login('Michaël'));
     const { body } = await alice.post('/api/items').send({ title: 'Book' });
     const before = (await alice.get('/api/people')).body;
     await bob.post(`/api/items/${body.item.id}/claim`);
@@ -92,8 +92,8 @@ describe('privacy: the owner never receives claim data', () => {
   });
 
   it('an item looks identical to the owner before and after being claimed or unclaimed', async () => {
-    const alice = as(await login('Alice'));
-    const bob = as(await login('Bob'));
+    const alice = as(await login('Stéphanie'));
+    const bob = as(await login('Michaël'));
     const { body } = await alice.post('/api/items').send({ title: 'Book' });
     const before = (await alice.get('/api/items')).body;
     await bob.post(`/api/items/${body.item.id}/claim`);
@@ -110,8 +110,8 @@ describe('privacy: the owner never receives claim data', () => {
     expect(unclaim.status).toBe(200);
     expect(JSON.stringify(unclaim.body)).toBe(JSON.stringify({ ok: true }));
     // The claim must survive the owner's unclaim attempt.
-    const carol = as(await login('Carol'));
-    expect((await carol.get('/api/people/Alice/items')).body.items[0].claimed).toBe(true);
+    const carol = as(await login('Nathaniel'));
+    expect((await carol.get('/api/people/St%C3%A9phanie/items')).body.items[0].claimed).toBe(true);
   });
 
   it('deleting a claimed item works for the owner and leaves no trace', async () => {
@@ -125,15 +125,15 @@ describe('claiming by other family members', () => {
   it('shows others that an item is taken without saying by whom', async () => {
     const { bob, carol } = await aliceWithClaimedItem();
 
-    const forCarol = (await carol.get('/api/people/Alice/items')).body.items[0];
+    const forCarol = (await carol.get('/api/people/St%C3%A9phanie/items')).body.items[0];
     expect(forCarol.claimed).toBe(true);
     expect(forCarol.claimedByMe).toBe(false);
-    expect(JSON.stringify(forCarol)).not.toContain('Bob');
+    expect(JSON.stringify(forCarol)).not.toContain('Michaël');
 
-    const forBob = (await bob.get('/api/people/Alice/items')).body.items[0];
+    const forBob = (await bob.get('/api/people/St%C3%A9phanie/items')).body.items[0];
     expect(forBob.claimed).toBe(true);
     expect(forBob.claimedByMe).toBe(true);
-    expect(JSON.stringify(forBob)).not.toContain('Bob');
+    expect(JSON.stringify(forBob)).not.toContain('Michaël');
   });
 
   it('rejects a second claimer, and only the claimer can undo a claim', async () => {
@@ -141,26 +141,26 @@ describe('claiming by other family members', () => {
     expect((await carol.post(`/api/items/${id}/claim`)).status).toBe(409);
 
     await carol.delete(`/api/items/${id}/claim`);
-    expect((await carol.get('/api/people/Alice/items')).body.items[0].claimed).toBe(true);
+    expect((await carol.get('/api/people/St%C3%A9phanie/items')).body.items[0].claimed).toBe(true);
 
     expect((await bob.post(`/api/items/${id}/claim`)).status).toBe(200); // idempotent
     await bob.delete(`/api/items/${id}/claim`);
-    const after = (await carol.get('/api/people/Alice/items')).body.items[0];
+    const after = (await carol.get('/api/people/St%C3%A9phanie/items')).body.items[0];
     expect(after.claimed).toBe(false);
     expect((await carol.post(`/api/items/${id}/claim`)).status).toBe(200);
     expect(alice).toBeDefined();
   });
 
   it('404s when claiming an item that does not exist', async () => {
-    const bob = as(await login('Bob'));
+    const bob = as(await login('Michaël'));
     expect((await bob.post('/api/items/999/claim')).status).toBe(404);
   });
 });
 
 describe('items', () => {
   it('lets people add link and free-text items, and only delete their own', async () => {
-    const alice = as(await login('Alice'));
-    const bob = as(await login('Bob'));
+    const alice = as(await login('Stéphanie'));
+    const bob = as(await login('Michaël'));
     const link = await alice.post('/api/items').send({ title: 'Lamp', url: 'https://shop.example/lamp', price: '$40' });
     const text = await alice.post('/api/items').send({ title: 'Gift card', note: 'Any store, ~$50' });
     expect(link.status).toBe(201);
@@ -172,7 +172,7 @@ describe('items', () => {
   });
 
   it('validates input', async () => {
-    const alice = as(await login('Alice'));
+    const alice = as(await login('Stéphanie'));
     expect((await alice.post('/api/items').send({})).status).toBe(400);
     expect((await alice.post('/api/items').send({ title: 'x', url: 'javascript:alert(1)' })).status).toBe(400);
     expect((await alice.post('/api/items').send({ title: 'x', image: 'data:text/html,hi' })).status).toBe(400);
@@ -182,14 +182,14 @@ describe('items', () => {
 
 describe('auth', () => {
   it('requires a valid session for everything but login and the name list', async () => {
-    for (const path of ['/api/me', '/api/items', '/api/people', '/api/people/Alice/items']) {
+    for (const path of ['/api/me', '/api/items', '/api/people', '/api/people/St%C3%A9phanie/items']) {
       expect((await request(app).get(path)).status).toBe(401);
     }
     expect((await request(app).get('/api/members')).body.members).toEqual(config.members);
   });
 
   it('rejects wrong passcodes and unknown names with the same response', async () => {
-    const wrongPass = await request(app).post('/api/login').send({ name: 'Alice', passcode: 'nope' });
+    const wrongPass = await request(app).post('/api/login').send({ name: 'Stéphanie', passcode: 'nope' });
     const wrongName = await request(app).post('/api/login').send({ name: 'Mallory', passcode: config.passcode });
     expect(wrongPass.status).toBe(401);
     expect(wrongName.status).toBe(401);
@@ -197,25 +197,44 @@ describe('auth', () => {
   });
 
   it('rejects tampered or forged session cookies', async () => {
-    const cookie = await login('Alice');
+    const cookie = await login('Stéphanie');
     const [name, token] = cookie.split('=');
     const [payload, sig] = token.split('.');
-    const forgedPayload = Buffer.from(JSON.stringify({ u: 'Bob', exp: Date.now() + 1e9 })).toString('base64url');
+    const forgedPayload = Buffer.from(JSON.stringify({ u: 'Michaël', exp: Date.now() + 1e9 })).toString('base64url');
     expect((await request(app).get('/api/me').set('Cookie', `${name}=${forgedPayload}.${sig}`)).status).toBe(401);
     expect((await request(app).get('/api/me').set('Cookie', `${name}=${payload}.bad`)).status).toBe(401);
-    expect((await request(app).get('/api/me').set('Cookie', cookie)).body.name).toBe('Alice');
+    expect((await request(app).get('/api/me').set('Cookie', cookie)).body.name).toBe('Stéphanie');
+  });
+
+  it('signs in regardless of accents, case or Unicode form, and always uses the canonical name', async () => {
+    for (const typed of ['stephanie', 'STÉPHANIE', 'Ste\u0301phanie', ' Stéphanie ']) {
+      const res = await request(app).post('/api/login').send({ name: typed, passcode: config.passcode });
+      expect(res.status, typed).toBe(200);
+      expect(res.body.name).toBe('Stéphanie');
+    }
+    const michael = await request(app).post('/api/login').send({ name: 'michael', passcode: config.passcode });
+    expect(michael.body.name).toBe('Michaël');
+  });
+
+  it('finds people by accent-tolerant, URL-encoded names', async () => {
+    const bob = as(await login('Michaël'));
+    for (const seg of ['St%C3%A9phanie', 'stephanie', 'Ste%CC%81phanie']) {
+      const res = await bob.get(`/api/people/${seg}/items`);
+      expect(res.status, seg).toBe(200);
+      expect(res.body.owner).toBe('Stéphanie');
+    }
   });
 
   it('sets an HttpOnly cookie and clears it on logout', async () => {
-    const res = await request(app).post('/api/login').send({ name: 'alice', passcode: config.passcode });
-    expect(res.body.name).toBe('Alice');
+    const res = await request(app).post('/api/login').send({ name: 'stephanie', passcode: config.passcode });
+    expect(res.body.name).toBe('Stéphanie');
     expect(String(res.headers['set-cookie'])).toMatch(/HttpOnly/);
     const out = await request(app).post('/api/logout');
     expect(String(out.headers['set-cookie'])).toMatch(/Max-Age=0/);
   });
 
   it('blocks cross-site writes', async () => {
-    const alice = as(await login('Alice'));
+    const alice = as(await login('Stéphanie'));
     const res = await alice.post('/api/items').set('Origin', 'https://evil.example').send({ title: 'x' });
     expect(res.status).toBe(403);
   });

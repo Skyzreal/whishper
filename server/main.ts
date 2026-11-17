@@ -22,7 +22,7 @@ if (existsSync(webRoot)) {
   app.get(/.*/, (_req, res) => res.sendFile(resolve(webRoot, 'index.html')));
 } else {
   app.get('/', (_req, res) => {
-    res.type('text/plain').send('Whishper API is running. In development open the app at http://localhost:4200 (npm run dev).');
+    res.type('text/plain').send('Whishper API en marche. En développement, ouvre l\'application sur http://localhost:4200 (npm run dev).');
   });
 }
 

@@ -8,7 +8,7 @@ export class Avatar {
   name = input.required<string>();
   size = input(36);
 
-  protected initial = computed(() => this.name().trim().charAt(0).toUpperCase());
+  protected initial = computed(() => Array.from(this.name().trim().normalize('NFC'))[0]?.toLocaleUpperCase('fr') ?? '');
   protected color = computed(() => {
     let h = 0;
     for (const ch of this.name().toLowerCase()) h = (h * 31 + ch.charCodeAt(0)) % 360;

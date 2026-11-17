@@ -8,40 +8,43 @@ import { Api, errorMessage } from '../api';
   imports: [FormsModule],
   template: `
     <form class="panel add" (ngSubmit)="submit()" #f="ngForm">
-      <h2>Add something you'd love</h2>
+      <h2>Ajoute quelque chose qui te ferait plaisir</h2>
       <label>
-        Link <span class="hint">(optional – paste a product page from any shop)</span>
+        Lien <span class="hint">(facultatif – colle la page d'un produit de n'importe quelle boutique)</span>
         <span class="row">
           <input name="url" type="url" inputmode="url" placeholder="https://…" [(ngModel)]="url" (paste)="onPaste()" (blur)="fetchDetails()" />
           <button type="button" class="secondary" [disabled]="!url() || fetching()" (click)="fetchDetails(true)">
-            {{ fetching() ? 'Fetching…' : 'Fetch details' }}
+            {{ fetching() ? 'Recherche…' : 'Récupérer les infos' }}
           </button>
         </span>
       </label>
+      @if (hint()) {
+        <p class="hint-note" role="status">{{ hint() }}</p>
+      }
       @if (image()) {
         <div class="preview">
           <img [src]="image()" alt="" referrerpolicy="no-referrer" />
-          <button type="button" class="link" (click)="image.set('')">Remove picture</button>
+          <button type="button" class="link" (click)="image.set('')">Retirer l'image</button>
         </div>
       }
       <label>
-        What is it?
-        <input name="title" required maxlength="200" placeholder="e.g. Cozy blanket, or Gift card" [(ngModel)]="title" />
+        C'est quoi ?
+        <input name="title" required maxlength="200" placeholder="p. ex. Couverture douillette, ou Carte-cadeau" [(ngModel)]="title" />
       </label>
       <div class="row two">
         <label>
-          Price / amount <span class="hint">(optional)</span>
-          <input name="price" maxlength="50" placeholder="e.g. $40 or around $50" [(ngModel)]="price" />
+          Prix / montant <span class="hint">(facultatif)</span>
+          <input name="price" maxlength="50" placeholder="p. ex. 40 $ ou environ 50 $" [(ngModel)]="price" />
         </label>
         <label>
-          Notes <span class="hint">(optional)</span>
-          <input name="note" maxlength="1000" placeholder="Size, colour, which store…" [(ngModel)]="note" />
+          Notes <span class="hint">(facultatif)</span>
+          <input name="note" maxlength="1000" placeholder="Taille, couleur, quel magasin…" [(ngModel)]="note" />
         </label>
       </div>
       @if (error()) {
         <p class="error" role="alert">{{ error() }}</p>
       }
-      <button type="submit" [disabled]="!title().trim() || saving()">{{ saving() ? 'Adding…' : 'Add to my list' }}</button>
+      <button type="submit" [disabled]="!title().trim() || saving()">{{ saving() ? 'Ajout…' : 'Ajouter à ma liste' }}</button>
     </form>
   `,
 })
@@ -57,6 +60,7 @@ export class AddItem {
   fetching = signal(false);
   saving = signal(false);
   error = signal('');
+  hint = signal('');
   private fetchedFor = '';
 
   onPaste() {
@@ -69,11 +73,17 @@ export class AddItem {
     this.fetchedFor = url;
     this.fetching.set(true);
     this.error.set('');
+    this.hint.set('');
     try {
       const p = await this.api.preview(url);
-      if (!this.title().trim() || force) this.title.set(p.title);
+      if (p.title && (!this.title().trim() || force)) this.title.set(p.title);
       if (p.image) this.image.set(p.image);
       if (p.price && (!this.price().trim() || force)) this.price.set(p.price);
+      if (p.partial) {
+        this.hint.set(
+          "Impossible de récupérer tous les détails de ce lien (le site bloque peut-être la lecture automatique). Vérifie le nom et ajoute le prix ou une note toi-même.",
+        );
+      }
     } catch (e) {
       this.error.set(errorMessage(e));
     } finally {
@@ -93,7 +103,7 @@ export class AddItem {
         price: this.price().trim() || undefined,
         note: this.note().trim() || undefined,
       });
-      for (const s of [this.url, this.title, this.price, this.note, this.image]) s.set('');
+      for (const s of [this.url, this.title, this.price, this.note, this.image, this.hint]) s.set('');
       this.fetchedFor = '';
       this.added.emit();
     } catch (e) {

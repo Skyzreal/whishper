@@ -6,14 +6,14 @@ import { People } from './pages/people';
 import { PersonPage } from './pages/person';
 
 export const routes: Routes = [
-  { path: 'login', component: Login, title: 'Sign in · Whishper' },
+  { path: 'login', component: Login, title: 'Connexion · Whishper' },
   {
     path: '',
     canActivate: [authGuard],
     children: [
-      { path: '', component: MyList, title: 'My wishlist · Whishper' },
-      { path: 'people', component: People, title: 'Family · Whishper' },
-      { path: 'people/:name', component: PersonPage, title: 'Wishlist · Whishper' },
+      { path: '', component: MyList,       title: 'Ma liste de souhaits · Whishper' },
+            { path: 'people', component: People, title: 'Famille · Whishper' },
+            { path: 'people/:name', component: PersonPage, title: 'Liste de souhaits · Whishper' },
     ],
   },
   { path: '**', redirectTo: '' },

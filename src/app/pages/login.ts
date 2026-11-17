@@ -10,25 +10,25 @@ import { Auth } from '../auth';
   template: `
     <section class="panel login">
       <h1>🎁 Whishper</h1>
-      <p class="lead">Our family wishlist. Pick your name and enter the family passcode.</p>
+      <p class="lead">Notre liste de souhaits familiale. Choisis ton prénom et entre le code secret de la famille.</p>
       <form (ngSubmit)="submit()">
         <label>
-          Who are you?
+          Qui es-tu ?
           <select name="name" required [(ngModel)]="name">
-            <option value="" disabled>Choose your name…</option>
+            <option value="" disabled>Choisis ton prénom…</option>
             @for (m of members(); track m) {
               <option [value]="m">{{ m }}</option>
             }
           </select>
         </label>
         <label>
-          Family passcode
+          Code secret de la famille
           <input name="passcode" type="password" autocomplete="current-password" required [(ngModel)]="passcode" />
         </label>
         @if (error()) {
           <p class="error" role="alert">{{ error() }}</p>
         }
-        <button type="submit" [disabled]="!name() || !passcode() || busy()">{{ busy() ? 'Signing in…' : 'Sign in' }}</button>
+        <button type="submit" [disabled]="!name() || !passcode() || busy()">{{ busy() ? 'Connexion…' : 'Se connecter' }}</button>
       </form>
     </section>
   `,

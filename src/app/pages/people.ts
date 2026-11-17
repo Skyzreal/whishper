@@ -8,8 +8,8 @@ import { Person } from '../models';
   selector: 'app-people',
   imports: [RouterLink, Avatar],
   template: `
-    <h1>Family</h1>
-    <p class="lead">Pick someone to see what they're hoping for.</p>
+    <h1>Famille</h1>
+    <p class="lead">Choisis quelqu'un pour voir ce qui lui ferait plaisir.</p>
     @if (error()) {
       <p class="error" role="alert">{{ error() }}</p>
     }
@@ -17,8 +17,8 @@ import { Person } from '../models';
       @for (p of people(); track p.name) {
         <a class="person" [routerLink]="p.name === me() ? '/' : ['/people', p.name]">
           <app-avatar [name]="p.name" [size]="56" />
-          <strong>{{ p.name }}{{ p.name === me() ? ' (you)' : '' }}</strong>
-          <span>{{ p.itemCount }} {{ p.itemCount === 1 ? 'item' : 'items' }}</span>
+          <strong>{{ p.name }}          {{ p.name === me() ? ' (toi)' : '' }}</strong>
+                    <span>{{ p.itemCount }} {{ p.itemCount > 1 ? 'cadeaux' : 'cadeau' }}</span>
         </a>
       }
     </div>

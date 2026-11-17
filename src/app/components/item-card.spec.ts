@@ -24,26 +24,26 @@ function render(item: Item, mode: 'own' | 'other'): HTMLElement {
 describe('ItemCard', () => {
   it('shows only a remove button on your own list, even if claim flags leak in', () => {
     const el = render({ ...base, claimed: true, claimedByMe: false }, 'own');
-    expect(el.textContent).not.toMatch(/taken|getting this|get this/i);
+    expect(el.textContent).not.toMatch(/réservé|occupe|occupes/i);
     expect(el.querySelector('.card.taken')).toBeNull();
-    expect(Array.from(el.querySelectorAll('button')).map((b) => b.textContent?.trim())).toEqual(['Remove']);
+    expect(Array.from(el.querySelectorAll('button')).map((b) => b.textContent?.trim())).toEqual(['Retirer']);
   });
 
   it('lets others claim an unclaimed item', () => {
     const el = render({ ...base, claimed: false, claimedByMe: false }, 'other');
-    expect(el.querySelector('button')?.textContent).toContain("I'll get this");
+    expect(el.querySelector('button')?.textContent).toContain("Je m'en occupe");
   });
 
   it('greys out items claimed by someone else, without naming them', () => {
     const el = render({ ...base, claimed: true, claimedByMe: false }, 'other');
     expect(el.querySelector('.card.taken')).not.toBeNull();
-    expect(el.textContent).toContain('Already taken');
+    expect(el.textContent).toContain('Déjà réservé');
     expect(el.querySelector('button')).toBeNull();
   });
 
   it('lets the claimer undo their own claim', () => {
     const el = render({ ...base, claimed: true, claimedByMe: true }, 'other');
-    expect(el.textContent).toContain("You're getting this");
-    expect(el.querySelector('button')?.textContent).toContain('Undo');
+    expect(el.textContent).toContain("Tu t'en occupes");
+    expect(el.querySelector('button')?.textContent).toContain('Annuler');
   });
 });

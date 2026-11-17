@@ -8,10 +8,10 @@ import { Item } from '../models';
   selector: 'app-my-list',
   imports: [AddItem, ItemCard],
   template: `
-    <h1>My wishlist</h1>
+    <h1>Ma liste de souhaits</h1>
     <p class="lead">
-      Everyone in the family can see this list. You'll never see which of your items have been picked,
-      so your gifts stay a surprise. 🤫
+      Toute la famille peut voir cette liste. Tu ne verras jamais quels cadeaux ont été réservés,
+      pour que la surprise reste entière. 🤫
     </p>
 
     <app-add-item (added)="load()" />
@@ -25,7 +25,7 @@ import { Item } from '../models';
         <app-item-card [item]="item" mode="own" (remove)="remove($event)" />
       } @empty {
         @if (loaded()) {
-          <p class="empty">Nothing here yet. Add something above!</p>
+          <p class="empty">Rien pour l'instant. Ajoute un cadeau ci-dessus !</p>
         }
       }
     </div>
@@ -53,7 +53,7 @@ export class MyList implements OnInit {
   }
 
   async remove(item: Item) {
-    if (!confirm(`Remove "${item.title}" from your list?`)) return;
+    if (!confirm(`Retirer « ${item.title} » de ta liste ?`)) return;
     try {
       await this.api.removeItem(item.id);
       await this.load();

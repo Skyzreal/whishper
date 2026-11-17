@@ -113,8 +113,8 @@ export async function deleteOwnItem(db: Client, owner: string, itemId: number): 
 
 export async function claimItem(db: Client, viewer: string, itemId: number): Promise<void> {
   const item = await db.execute({ sql: 'SELECT owner FROM items WHERE id = ?', args: [itemId] });
-  if (!item.rows.length) throw new HttpError(404, 'Item not found');
-  if (item.rows[0]['owner'] === viewer) throw new HttpError(403, 'You cannot reserve items on your own list');
+  if (!item.rows.length) throw new HttpError(404, 'Cadeau introuvable');
+  if (item.rows[0]['owner'] === viewer) throw new HttpError(403, 'Tu ne peux pas réserver un cadeau de ta propre liste');
 
   const ins = await db.execute({
     sql: 'INSERT OR IGNORE INTO claims (item_id, claimer) VALUES (?, ?)',
@@ -122,7 +122,7 @@ export async function claimItem(db: Client, viewer: string, itemId: number): Pro
   });
   if (ins.rowsAffected === 0) {
     const existing = await db.execute({ sql: 'SELECT claimer FROM claims WHERE item_id = ?', args: [itemId] });
-    if (existing.rows[0]?.['claimer'] !== viewer) throw new HttpError(409, 'Someone else already took this one');
+    if (existing.rows[0]?.['claimer'] !== viewer) throw new HttpError(409, "Quelqu'un a déjà réservé ce cadeau");
   }
 }
 

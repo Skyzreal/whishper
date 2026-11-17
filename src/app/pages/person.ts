@@ -9,13 +9,13 @@ import { Item } from '../models';
   selector: 'app-person',
   imports: [ItemCard, Avatar, RouterLink],
   template: `
-    <a routerLink="/people" class="back">← Family</a>
+    <a routerLink="/people" class="back">    ← Famille</a>
     <header class="person-head">
       <app-avatar [name]="owner() || name()" [size]="56" />
       <div>
-        <h1>{{ owner() || name() }}'s wishlist</h1>
+            <h1>Liste de souhaits de {{ owner() || name() }}</h1>
         <p class="lead">
-          Tap "I'll get this" to reserve something. Others will see it's taken, but {{ owner() || name() }} never will.
+              Clique sur « Je m'en occupe » pour réserver un cadeau. Les autres verront qu'il est pris, mais {{ owner() || name() }} ne le verra jamais.
         </p>
       </div>
     </header>
@@ -29,7 +29,7 @@ import { Item } from '../models';
         <app-item-card [item]="item" mode="other" (claim)="claim($event)" (unclaim)="unclaim($event)" />
       } @empty {
         @if (loaded()) {
-          <p class="empty">{{ owner() }} hasn't added anything yet.</p>
+          <p class="empty">{{ owner() }} n'a encore rien ajouté.</p>
         }
       }
     </div>
