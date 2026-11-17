@@ -19,7 +19,7 @@ import { Item } from '../models';
         <p>Tout le monde peut lire ta liste, pas de mode "privé" ou "à publier", juste toi peut la changer ! :)</p>
       </div>
     </header>
-    <p class="notice">Hello ! :3 Tu verras jamais ce qui a été réservé!!! C'est fait exprès, pour garder la surprise! Tu peux mettre 40 fois carte cadeau Home Depot si tu veux, aucun check pour voir si c'est un doublon</p>
+    <p class="notice">Hello ! :3 Tu verras jamais ce qui a été réservé!!! C'est fait exprès, pour garder la surprise!</p>
 
     <app-add-item [(open)]="adding" (added)="load()" />
     @for (child of managed(); track child) {
