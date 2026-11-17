@@ -1,4 +1,4 @@
-import { Component, input, model, output, signal } from '@angular/core';
+import { Component, computed, input, model, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { inject } from '@angular/core';
 import { Api, errorMessage } from '../api';
@@ -8,7 +8,7 @@ import { Api, errorMessage } from '../api';
   imports: [FormsModule],
   template: `
     @if (!open()) {
-      <button type="button" class="add-toggle" (click)="open.set(true)">{{ forName() ? 'Ajouter pour ' + forName() : 'Ajouter à ma liste' }}</button>
+      <button type="button" class="add-toggle" (click)="open.set(true)">{{ forName() ? 'Ajouter à la liste ' + deNom() : 'Ajouter à ma liste' }}</button>
     } @else {
     <form class="panel add" (ngSubmit)="submit()" #f="ngForm">
       <div class="panel-head">
@@ -65,6 +65,7 @@ export class AddItem {
   open = model(false);
   /** Set when adding to the list of someone you manage. */
   forName = input('');
+  deNom = computed(() => (/^[aeiouyhàâéèêëîïôù]/i.test(this.forName()) ? "d'" : 'de ') + this.forName());
 
   url = signal('');
   title = signal('');

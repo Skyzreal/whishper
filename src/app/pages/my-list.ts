@@ -1,4 +1,5 @@
 import { Component, ElementRef, OnInit, effect, inject, signal, untracked } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { AddRequest } from '../add-request';
 import { Api, errorMessage } from '../api';
 import { Auth } from '../auth';
@@ -9,7 +10,7 @@ import { Item } from '../models';
 
 @Component({
   selector: 'app-my-list',
-  imports: [AddItem, ItemCard, Avatar],
+  imports: [AddItem, ItemCard, Avatar, RouterLink],
   template: `
     <header class="hero">
       <app-avatar [name]="auth.user() ?? ''" [size]="56" />
@@ -21,6 +22,15 @@ import { Item } from '../models';
     <p class="notice">Hello ! :3 Tu verras jamais ce qui a été réservé!!! C'est fait exprès, pour garder la surprise! Tu peux mettre 40 fois carte cadeau Home Depot si tu veux, aucun check pour voir si c'est un doublon</p>
 
     <app-add-item [(open)]="adding" (added)="load()" />
+    @for (child of managed(); track child) {
+      <app-add-item [forName]="child" (added)="addedFor.set(child)" />
+    }
+    @if (addedFor()) {
+      <p class="notice" role="status">
+        C'est ajouté à la liste {{ deNom(addedFor()) }}.
+        <a [routerLink]="['/people', addedFor()]">Voir sa liste</a>
+      </p>
+    }
 
     @if (error()) {
       <p class="error" role="alert">{{ error() }}</p>
@@ -44,6 +54,12 @@ export class MyList implements OnInit {
   protected auth = inject(Auth);
   adding = signal(false);
   items = signal<Item[]>([]);
+  managed = signal<string[]>([]);
+  addedFor = signal('');
+
+  protected deNom(name: string) {
+    return (/^[aeiouyhàâéèêëîïôù]/i.test(name) ? "d'" : 'de ') + name;
+  }
   loaded = signal(false);
   error = signal('');
 
@@ -65,6 +81,7 @@ export class MyList implements OnInit {
   async load() {
     try {
       this.items.set(await this.api.myItems());
+      this.managed.set((await this.api.people()).people.filter((p) => p.canManage).map((p) => p.name));
       this.error.set('');
     } catch (e) {
       this.error.set(errorMessage(e));
