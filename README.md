@@ -75,6 +75,11 @@ The local database is created at `data/whishper.db`.
 | `npm run build` | Production build of the Angular app into `dist/whishper/browser` |
 | `npm start` | Serve the API **and** the built app from one Node process (self-hosting) |
 
+### Troubleshooting
+
+- In development, open the app at **http://localhost:4200**. Port 3000 is the API only (it shows a short hint at `/`).
+- If `npm run dev` fails because port 3000 or 4200 is already in use, stop the other process first; `npm run dev` stops both halves if either one fails to start.
+
 ## Deploy for free (Vercel + Turso)
 
 1. **Create the database** at [turso.tech](https://turso.tech) (free tier):

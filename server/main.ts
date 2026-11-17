@@ -20,6 +20,10 @@ const webRoot = resolve('dist/whishper/browser');
 if (existsSync(webRoot)) {
   app.use(express.static(webRoot));
   app.get(/.*/, (_req, res) => res.sendFile(resolve(webRoot, 'index.html')));
+} else {
+  app.get('/', (_req, res) => {
+    res.type('text/plain').send('Whishper API is running. In development open the app at http://localhost:4200 (npm run dev).');
+  });
 }
 
 const port = Number(process.env['PORT'] ?? 3000);

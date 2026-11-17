@@ -31,9 +31,11 @@ export class Auth {
 }
 
 export const authGuard: CanActivateFn = async () => {
+  // inject() only works synchronously, so resolve everything before the first await.
   const auth = inject(Auth);
+  const router = inject(Router);
   await auth.ensureLoaded();
-  return auth.user() ? true : inject(Router).createUrlTree(['/login']);
+  return auth.user() ? true : router.createUrlTree(['/login']);
 };
 
 /** If the session expires mid-use, drop back to the login screen. */
