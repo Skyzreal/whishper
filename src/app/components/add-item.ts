@@ -49,7 +49,7 @@ import { Api, errorMessage } from '../api';
       </div>
       <label class="check">
         <input type="checkbox" name="multi" [(ngModel)]="multi" />
-        Plusieurs personnes peuvent l'offrir <span class="hint">(carte-cadeau, par exemple)</span>
+        A cocher si c'est quelque chose qui se rachète ! Pour que plusieurs puissent l'offrir (carte-cadeau, par exemple)
       </label>
       @if (error()) {
         <p class="error" role="alert">{{ error() }}</p>
