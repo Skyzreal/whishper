@@ -41,10 +41,10 @@ import { Avatar } from './components/avatar';
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg>
           <span>Réservés</span>
         </a>
+        <button type="button" class="tab-add" aria-label="Ajouter une idée" (click)="add()">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+        </button>
       </nav>
-      <button type="button" class="tab-add" aria-label="Ajouter une idée" (click)="add()">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-      </button>
     }
   `,
 })

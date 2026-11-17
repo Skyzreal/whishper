@@ -198,13 +198,13 @@ label.check input { width: auto; margin: 0; }
 .tabbar, .tab-add { display: none; }
 
 @media (max-width: 640px) {
-  body { padding-bottom: calc(4.75rem + env(safe-area-inset-bottom)); }
+  body { padding-bottom: env(safe-area-inset-bottom); }
   h1 { font-size: 1.65rem; }
   .topbar { padding: 0.6rem 1rem; gap: 0.5rem; flex-wrap: nowrap; align-items: center; }
   .topbar .top-nav, .me app-avatar, .me-name { display: none; }
   .me { margin-left: auto; }
 
-  .page { padding: 0 1rem 1.5rem; }
+  .page { padding: 0 1rem 5rem; }
   .hero {
     margin: 0 -1rem 1.25rem; padding: 1.25rem 1rem 1.4rem; gap: 0.8rem;
     background-color: var(--red); color: #fff;
@@ -230,9 +230,10 @@ label.check input { width: auto; margin: 0; }
 
   .grid { grid-template-columns: repeat(2, 1fr); }
 
+  /* sticky (et non fixed) : suit la barre d'adresse mobile sans laisser de vide en dessous */
   .tabbar {
     display: flex; align-items: center; justify-content: space-around;
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    position: sticky; left: 0; right: 0; bottom: 0; z-index: 20; margin-top: auto;
     padding: 0.4rem 0.5rem calc(0.4rem + env(safe-area-inset-bottom));
     background: var(--bg); border-top: 3px solid var(--gold);
   }
@@ -245,8 +246,8 @@ label.check input { width: auto; margin: 0; }
   .tab svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   .tab.active svg { fill: currentColor; fill-opacity: 0.15; }
   .tab-add, .tab-add:hover:not(:disabled) {
-    display: grid; place-items: center; position: fixed; z-index: 21;
-    right: 1.25rem; bottom: calc(6.4rem + env(safe-area-inset-bottom));
+    display: grid; place-items: center; position: absolute; z-index: 21;
+    right: 1.25rem; bottom: calc(100% + 1.4rem);
     width: 56px; height: 56px; min-height: 56px; padding: 0; border-radius: 50%;
     border: 0; color: #fff;
     background: radial-gradient(circle at 32% 26%, #f0757b 0%, var(--red) 48%, var(--red-dark) 100%);
