@@ -9,6 +9,7 @@ import { Auth } from '../auth';
   selector: 'app-login',
   imports: [FormsModule],
   template: `
+    <div class="snow" aria-hidden="true"></div>
     <section class="panel login">
       <img src="logo.png" alt="Whishper" class="login-logo" width="72" height="72">
       <h1>Temps de Noël !!</h1>

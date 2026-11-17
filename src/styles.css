@@ -3,17 +3,28 @@
 @import '@fontsource/karla/latin-700.css';
 @import '@fontsource/young-serif/latin-400.css';
 
+/* Thème Noël : tout passe par ces variables. Pour le retirer, remets les valeurs neutres ici
+   et supprime le bloc « Décor de Noël » en bas de ce fichier. */
 :root {
-  --bg: #faf7f2;
-  --paper: #fffdf9;
-  --ink: #26221f;
-  --muted: #7a726b;
-  --brand: #c0392b;
-  --brand-dark: #9e2e22;
-  --line: #e8e1d8;
-  --line-strong: #cfc5b8;
-  --ok: #2e7d4f;
-  --radius: 5px;
+  --bg: #fbf6ee;
+  --paper: #fffdf8;
+  --ink: #2a1f1c;
+  --muted: #6b5f58;
+  --red: #a4262c;
+  --red-dark: #7f1d22;
+  --pine: #1e5a3c;
+  --pine-dark: #154530;
+  --gold: #c8a04a;
+  --gold-soft: #f6ead0;
+  --navy: #142648;
+  --brand: var(--red);
+  --brand-dark: var(--red-dark);
+  --btn: var(--pine);
+  --btn-dark: var(--pine-dark);
+  --line: #eadfce;
+  --line-strong: #d4c5b0;
+  --ok: var(--pine);
+  --radius: 6px;
   --serif: 'Young Serif', Georgia, 'Times New Roman', serif;
 }
 
@@ -87,20 +98,20 @@ input, select {
   color: var(--ink);
   width: 100%;
 }
-input:focus, select:focus, button:focus-visible, a:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+input:focus, select:focus, button:focus-visible, a:focus-visible { outline: 3px solid var(--navy); outline-offset: 2px; }
 
 button {
   font: inherit;
   font-weight: 600;
   padding: 0.5rem 1rem;
-  border: 1px solid var(--brand);
+  border: 1px solid var(--btn);
   border-radius: var(--radius);
-  background: var(--brand);
+  background: var(--btn);
   color: #fff;
   cursor: pointer;
   white-space: nowrap;
 }
-button:hover:not(:disabled) { background: var(--brand-dark); border-color: var(--brand-dark); }
+button:hover:not(:disabled) { background: var(--btn-dark); border-color: var(--btn-dark); }
 button:disabled { opacity: 0.45; cursor: not-allowed; }
 button.secondary { background: transparent; color: var(--ink); border-color: var(--line-strong); }
 button.secondary:hover:not(:disabled) { background: transparent; border-color: var(--ink); }
@@ -121,7 +132,7 @@ button.link:hover:not(:disabled) { background: none; }
   padding: 1rem 0;
   border-bottom: 1px solid var(--line);
 }
-.card.taken { opacity: 0.5; }
+.card.taken .thumb, .card.taken .body { opacity: 0.55; }
 .card.taken h3 { text-decoration: line-through; text-decoration-thickness: 1px; }
 .card.removed { opacity: 0.65; font-style: italic; }
 .reservation-group { margin-top: 2rem; }
@@ -141,9 +152,10 @@ label.check { display: flex; align-items: center; gap: 0.5rem; font-weight: 400;
 label.check input { width: auto; margin: 0; }
 .external { font-size: 0.9rem; color: var(--muted); }
 .actions { display: flex; flex-direction: column; gap: 0.4rem; align-items: stretch; }
-.badge { font-size: 0.9rem; font-weight: 600; text-align: center; padding: 0.15rem 0; }
-.badge.taken { color: var(--muted); font-weight: 400; }
-.badge.mine { color: var(--ok); }
+.badge { font-size: 0.9rem; font-weight: 600; text-align: center; padding: 0.2rem 0.65rem; border-radius: 999px; }
+.badge.taken { color: #5b4f48; background: #efe6d8; border: 1px solid var(--line-strong); }
+.badge.mine { color: var(--pine-dark); background: #dff0e4; border: 1px solid #a9d1b5; }
+.badge.mine::before { content: '✓ '; }
 @media (max-width: 560px) {
   .card { grid-template-columns: 60px 1fr; gap: 0.85rem; }
   .thumb { width: 60px; height: 60px; }
@@ -179,9 +191,9 @@ label.check input { width: auto; margin: 0; }
 .panel-head h2 { margin: 0; }
 .add-toggle {
   width: 100%; margin-bottom: 1.25rem; padding: 0.75rem 1rem;
-  background: transparent; color: var(--brand); border: 1px solid var(--brand);
+  background: transparent; color: var(--btn); border: 1px dashed var(--btn);
 }
-.add-toggle:hover:not(:disabled) { background: #fbeeec; border-color: var(--brand); }
+.add-toggle:hover:not(:disabled) { background: #e8f1ea; color: var(--btn-dark); border-color: var(--btn-dark); }
 
 .tabbar, .tab-add { display: none; }
 
@@ -195,10 +207,13 @@ label.check input { width: auto; margin: 0; }
   .page { padding: 0 1rem 1.5rem; }
   .hero {
     margin: 0 -1rem 1.25rem; padding: 1.25rem 1rem 1.4rem; gap: 0.8rem;
-    background: var(--brand); color: #fff;
+    background-color: var(--red); color: #fff;
+    border-bottom: 3px solid var(--gold);
   }
+  .hero h1::after { color: var(--gold-soft); }
+  .hero a:focus-visible { outline-color: #fff; }
   .hero h1 { font-size: 1.6rem; }
-  .hero p { color: rgba(255, 255, 255, 0.9); font-size: 0.97rem; }
+  .hero p { color: rgba(255, 255, 255, 0.95); font-size: 0.97rem; }
   .hero .avatar { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85); }
   .hero .back { color: #fff; font-weight: 600; }
 
@@ -219,13 +234,13 @@ label.check input { width: auto; margin: 0; }
     display: flex; align-items: center; justify-content: space-around;
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
     padding: 0.4rem 0.5rem calc(0.4rem + env(safe-area-inset-bottom));
-    background: var(--bg); border-top: 1px solid var(--line-strong);
+    background: var(--bg); border-top: 3px solid var(--gold);
   }
   .tab {
     flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 0.1rem;
     padding: 0.3rem 0; text-decoration: none; color: var(--muted); font-size: 0.78rem;
   }
-  .tab.active { color: var(--brand); font-weight: 700; }
+  .tab.active { color: var(--pine); font-weight: 700; }
   .tab span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tab svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   .tab.active svg { fill: currentColor; fill-opacity: 0.15; }
@@ -233,4 +248,64 @@ label.check input { width: auto; margin: 0; }
     display: inline-flex; align-items: center; gap: 0.35rem; flex: none;
     padding: 0.6rem 1.1rem; margin: 0 0.25rem; font-size: 1rem;
   }
+}
+
+/* ===== Décor de Noël (supprime ce bloc pour retirer le décor ; les couleurs sont dans :root) ===== */
+.topbar { border-bottom: 0; padding-bottom: 0.9rem; }
+.topbar::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -9px; height: 10px; pointer-events: none;
+  background:
+    radial-gradient(circle at 12px 5px, var(--red) 3px, transparent 3.5px),
+    radial-gradient(circle at 36px 5px, var(--gold) 3px, transparent 3.5px),
+    radial-gradient(circle at 60px 5px, var(--pine) 3px, transparent 3.5px),
+    linear-gradient(var(--pine), var(--pine)) 0 0 / 100% 1px no-repeat;
+  background-size: 72px 10px, 72px 10px, 72px 10px, 100% 1px;
+}
+.brand { color: var(--red-dark); }
+.hero h1::after { content: ' ✦' / ''; color: var(--gold); font-size: 0.55em; vertical-align: 0.35em; }
+.panel { box-shadow: 0 1px 0 rgba(42, 31, 28, 0.04); }
+.panel.login { border-top: 5px solid var(--red); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); position: relative; z-index: 1; }
+.panel.login h1 { color: var(--red-dark); }
+.panel.login h1::after { content: none; }
+.person:hover { background: #fff; box-shadow: inset 0 -3px 0 var(--pine); }
+.add-toggle::before { content: '🎁 ' / ''; }
+.hint-note { color: #5e4300; background: var(--gold-soft); border-left-color: var(--gold); }
+
+@media (max-width: 640px) {
+  .page { padding-top: 12px; }
+  .hero {
+    background-image:
+      radial-gradient(circle, rgba(255, 255, 255, 0.35) 1.5px, transparent 2px),
+      radial-gradient(circle, rgba(255, 255, 255, 0.22) 1px, transparent 1.5px);
+    background-size: 46px 46px, 31px 31px;
+    background-position: 8px 10px, 20px 24px;
+  }
+  .topbar::after { bottom: -9px; }
+}
+
+/* Neige sur la page de connexion : fond vert sapin, deux couches de flocons. */
+.snow {
+  position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none;
+  background: linear-gradient(180deg, #14301f 0%, var(--pine-dark) 55%, #1b3a5a 100%);
+}
+.snow::before, .snow::after {
+  content: ''; position: absolute; left: 0; right: 0; top: -300px; bottom: 0; will-change: transform;
+  animation: snow-fall 22s linear infinite;
+}
+.snow::before {
+  background-image:
+    radial-gradient(circle, rgba(255, 255, 255, 0.85) 2px, transparent 2.5px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.6) 1.5px, transparent 2px);
+  background-size: 300px 300px, 150px 150px;
+  background-position: 40px 60px, 120px 20px;
+}
+.snow::after {
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.5) 1.2px, transparent 1.8px);
+  background-size: 150px 150px;
+  background-position: 70px 90px;
+  animation-duration: 34s;
+}
+@keyframes snow-fall { to { transform: translateY(300px); } }
+@media (prefers-reduced-motion: reduce) {
+  .snow::before, .snow::after { animation: none; }
 }
