@@ -11,7 +11,7 @@ import { Person } from '../models';
     <header class="hero">
       <div>
         <h1>Famille</h1>
-        <p>Clique sur quelqu'un pour voir sa liste.</p>
+        <p>Tu peux cliquer sur quelqu'un pour voir sa liste!</p>
       </div>
     </header>
     @if (error()) {

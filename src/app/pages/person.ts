@@ -14,7 +14,7 @@ import { Item } from '../models';
       <app-avatar [name]="owner() || name()" [size]="56" />
       <div>
         <h1>La liste de {{ owner() || name() }}</h1>
-        <p>Clique sur « Je m'en occupe » pour réserver un cadeau. Les autres verront qu'il est pris, {{ owner() || name() }} non.</p>
+        <p>Clique sur "Je m'en occupe" pour réserver un cadeau. Les autres verront qu'il est pris, mais pas {{ owner() || name() }} !</p>
       </div>
     </header>
     @if (error()) {
