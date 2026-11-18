@@ -292,14 +292,29 @@ label.check input { width: auto; margin: 0; }
 
 /* ===== Décor de Noël (supprime ce bloc pour retirer le décor ; les couleurs sont dans :root) ===== */
 .topbar { border-bottom: 0; padding-bottom: 0.9rem; }
+/* Guirlande : chaque couleur a son niveau d'allumage (0 = éteinte, 1 = allumée), animé à tour de rôle. */
+@property --on-red { syntax: '<number>'; inherits: false; initial-value: 1; }
+@property --on-gold { syntax: '<number>'; inherits: false; initial-value: 1; }
+@property --on-pine { syntax: '<number>'; inherits: false; initial-value: 1; }
 .topbar::after {
-  content: ''; position: absolute; left: 0; right: 0; bottom: -9px; height: 10px; pointer-events: none;
+  content: ''; position: absolute; left: 0; right: 0; bottom: -19px; height: 20px; pointer-events: none;
+  --bulb-off: #4a3a34;
+  --lit-red: color-mix(in srgb, #e0303f calc(var(--on-red) * 100%), var(--bulb-off));
+  --lit-gold: color-mix(in srgb, #f5c542 calc(var(--on-gold) * 100%), var(--bulb-off));
+  --lit-pine: color-mix(in srgb, #2f9a5a calc(var(--on-pine) * 100%), var(--bulb-off));
   background:
-    radial-gradient(circle at 12px 5px, var(--red) 3px, transparent 3.5px),
-    radial-gradient(circle at 36px 5px, var(--gold) 3px, transparent 3.5px),
-    radial-gradient(circle at 60px 5px, var(--pine) 3px, transparent 3.5px),
-    linear-gradient(var(--pine), var(--pine)) 0 0 / 100% 1px no-repeat;
-  background-size: 72px 10px, 72px 10px, 72px 10px, 100% 1px;
+    radial-gradient(circle at 16px 11px, var(--lit-red) 5.5px, color-mix(in srgb, var(--lit-red) calc(var(--on-red) * 40%), transparent) 6.5px, transparent 10px),
+    radial-gradient(circle at 48px 11px, var(--lit-gold) 5.5px, color-mix(in srgb, var(--lit-gold) calc(var(--on-gold) * 40%), transparent) 6.5px, transparent 10px),
+    radial-gradient(circle at 80px 11px, var(--lit-pine) 5.5px, color-mix(in srgb, var(--lit-pine) calc(var(--on-pine) * 40%), transparent) 6.5px, transparent 10px),
+    linear-gradient(var(--pine), var(--pine)) 0 0 / 100% 2px no-repeat;
+  background-size: 96px 20px, 96px 20px, 96px 20px, 100% 2px;
+  animation: bulb-red 8s infinite, bulb-gold 8s infinite, bulb-pine 8s infinite;
+}
+@keyframes bulb-red { 0%, 6% { --on-red: 1; } 10%, 28% { --on-red: 0; } 32%, 100% { --on-red: 1; } }
+@keyframes bulb-pine { 0%, 36% { --on-pine: 1; } 40%, 61% { --on-pine: 0; } 65%, 100% { --on-pine: 1; } }
+@keyframes bulb-gold { 0%, 69% { --on-gold: 1; } 73%, 94% { --on-gold: 0; } 98%, 100% { --on-gold: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .topbar::after { animation: none; }
 }
 .brand { color: var(--red-dark); }
 .hero h1::after { content: ' ✦' / ''; color: var(--gold); font-size: 0.55em; vertical-align: 0.35em; }
@@ -311,7 +326,7 @@ label.check input { width: auto; margin: 0; }
 .hint-note { color: #5e4300; background: var(--gold-soft); border-left-color: var(--gold); }
 
 @media (max-width: 640px) {
-  .page { padding-top: 12px; }
+  .page { padding-top: 22px; }
   .hero {
     background-image:
       radial-gradient(circle, rgba(255, 255, 255, 0.35) 1.5px, transparent 2px),
@@ -319,7 +334,7 @@ label.check input { width: auto; margin: 0; }
     background-size: 46px 46px, 31px 31px;
     background-position: 8px 10px, 20px 24px;
   }
-  .topbar::after { bottom: -9px; }
+  .topbar::after { bottom: -19px; }
 }
 
 /* Neige sur la page de connexion : fond vert sapin, deux couches de flocons. */
