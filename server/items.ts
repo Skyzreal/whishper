@@ -11,6 +11,8 @@ export interface OwnItem {
   note: string | null;
   /** Several people may each reserve it (e.g. a gift card), and they can see each other's names. */
   multi: boolean;
+  /** Marked by the owner as something they especially want; visible to everyone and sorted first. */
+  favorite: boolean;
   createdAt: string;
 }
 
@@ -30,6 +32,18 @@ export interface ItemInput {
   price?: string | null;
   note?: string | null;
   multi?: boolean;
+  favorite?: boolean;
+}
+
+/** Fields to change on an existing item; a missing key is left untouched, null clears the field. */
+export interface ItemPatch {
+  title?: string;
+  url?: string | null;
+  image?: string | null;
+  price?: string | null;
+  note?: string | null;
+  multi?: boolean;
+  favorite?: boolean;
 }
 
 export class HttpError extends Error {
@@ -51,6 +65,7 @@ function toOwnItem(row: Record<string, unknown>): OwnItem {
     price: (row['price'] as string | null) ?? null,
     note: (row['note'] as string | null) ?? null,
     multi: Number(row['multi']) === 1,
+    favorite: Number(row['favorite']) === 1,
     createdAt: String(row['created_at']),
   };
 }
@@ -67,16 +82,16 @@ export async function getListForViewer(
 ): Promise<OwnItem[] | OtherItem[]> {
   if (viewer === owner) {
     const res = await db.execute({
-      sql: 'SELECT id, owner, title, url, image, price, note, multi, created_at FROM items WHERE owner = ? AND deleted_at IS NULL ORDER BY id DESC',
+      sql: 'SELECT id, owner, title, url, image, price, note, multi, favorite, created_at FROM items WHERE owner = ? AND deleted_at IS NULL ORDER BY favorite DESC, id DESC',
       args: [owner],
     });
     return res.rows.map((r) => toOwnItem(r as unknown as Record<string, unknown>));
   }
 
   const res = await db.execute({
-    sql: `SELECT i.id, i.owner, i.title, i.url, i.image, i.price, i.note, i.multi, i.created_at, c.claimer AS claimer
+    sql: `SELECT i.id, i.owner, i.title, i.url, i.image, i.price, i.note, i.multi, i.favorite, i.created_at, c.claimer AS claimer
           FROM items i LEFT JOIN claims c ON c.item_id = i.id
-          WHERE i.owner = ? AND i.deleted_at IS NULL ORDER BY i.id DESC, c.created_at, c.claimer`,
+          WHERE i.owner = ? AND i.deleted_at IS NULL ORDER BY i.favorite DESC, i.id DESC, c.created_at, c.claimer`,
     args: [owner],
   });
   const byId = new Map<number, OtherItem>();
@@ -104,11 +119,40 @@ export async function countItemsByOwner(db: Client): Promise<Map<string, number>
 
 export async function addItem(db: Client, owner: string, input: ItemInput): Promise<OwnItem> {
   const res = await db.execute({
-    sql: `INSERT INTO items (owner, title, url, image, price, note, multi) VALUES (?, ?, ?, ?, ?, ?, ?)
-          RETURNING id, owner, title, url, image, price, note, multi, created_at`,
-    args: [owner, input.title, input.url ?? null, input.image ?? null, input.price ?? null, input.note ?? null, input.multi ? 1 : 0],
+    sql: `INSERT INTO items (owner, title, url, image, price, note, multi, favorite) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          RETURNING id, owner, title, url, image, price, note, multi, favorite, created_at`,
+    args: [owner, input.title, input.url ?? null, input.image ?? null, input.price ?? null, input.note ?? null, input.multi ? 1 : 0, input.favorite ? 1 : 0],
   });
   return toOwnItem(res.rows[0] as unknown as Record<string, unknown>);
+}
+
+/**
+ * `owners` is the viewer plus anyone whose list they manage. Touches only the `items` table and answers
+ * the same whether or not the item is claimed, so editing can't be used to probe claims.
+ */
+export async function updateOwnItem(db: Client, owners: string[], itemId: number, patch: ItemPatch): Promise<OwnItem | null> {
+  const sets: string[] = [];
+  const args: (string | number | null)[] = [];
+  const set = (column: string, value: string | number | null) => {
+    sets.push(`${column} = ?`);
+    args.push(value);
+  };
+  if (patch.title !== undefined) set('title', patch.title);
+  if (patch.url !== undefined) set('url', patch.url);
+  if (patch.image !== undefined) set('image', patch.image);
+  if (patch.price !== undefined) set('price', patch.price);
+  if (patch.note !== undefined) set('note', patch.note);
+  if (patch.multi !== undefined) set('multi', patch.multi ? 1 : 0);
+  if (patch.favorite !== undefined) set('favorite', patch.favorite ? 1 : 0);
+  if (!sets.length) throw new HttpError(400, 'Rien à modifier');
+
+  const res = await db.execute({
+    sql: `UPDATE items SET ${sets.join(', ')}
+          WHERE id = ? AND owner IN (${owners.map(() => '?').join(',')}) AND deleted_at IS NULL
+          RETURNING id, owner, title, url, image, price, note, multi, favorite, created_at`,
+    args: [...args, itemId, ...owners],
+  });
+  return res.rows.length ? toOwnItem(res.rows[0] as unknown as Record<string, unknown>) : null;
 }
 
 /** `owners` is the viewer plus anyone whose list they manage; all of them get the owner view. */
@@ -180,7 +224,7 @@ export interface Reservation extends OwnItem {
 
 export async function listReservations(db: Client, viewer: string): Promise<Reservation[]> {
   const res = await db.execute({
-    sql: `SELECT i.id, i.owner, i.title, i.url, i.image, i.price, i.note, i.multi, i.created_at, i.deleted_at
+    sql: `SELECT i.id, i.owner, i.title, i.url, i.image, i.price, i.note, i.multi, i.favorite, i.created_at, i.deleted_at
           FROM claims c JOIN items i ON i.id = c.item_id
           WHERE c.claimer = ? ORDER BY i.owner, i.id DESC`,
     args: [viewer],

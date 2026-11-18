@@ -33,7 +33,11 @@ import { Item } from '../models';
     <div class="list">
       @for (item of items(); track item.id) {
         @if (canManage()) {
-          <app-item-card [item]="item" mode="own" (remove)="remove($event)" />
+          @if (editingId() === item.id) {
+            <app-add-item [item]="item" (saved)="saved()" (cancelled)="editingId.set(null)" />
+          } @else {
+            <app-item-card [item]="item" mode="own" (remove)="remove($event)" (edit)="editingId.set($event.id)" (toggleFavorite)="toggleFavorite($event)" />
+          }
         } @else {
           <app-item-card [item]="item" mode="other" (claim)="claim($event)" (unclaim)="unclaim($event)" />
         }
@@ -55,7 +59,17 @@ export class PersonPage {
   loaded = signal(false);
   canManage = signal(false);
   adding = signal(false);
+  editingId = signal<number | null>(null);
   error = signal('');
+
+  protected async saved() {
+    this.editingId.set(null);
+    await this.load(this.name());
+  }
+
+  protected async toggleFavorite(item: Item) {
+    await this.act(() => this.api.updateItem(item.id, { favorite: !item.favorite }));
+  }
 
   constructor() {
     effect(() => {

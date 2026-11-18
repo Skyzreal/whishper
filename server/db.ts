@@ -13,7 +13,8 @@ const SCHEMA = [
     note       TEXT,
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     deleted_at TEXT,
-    multi      INTEGER NOT NULL DEFAULT 0
+    multi      INTEGER NOT NULL DEFAULT 0,
+    favorite   INTEGER NOT NULL DEFAULT 0
   )`,
   `CREATE INDEX IF NOT EXISTS items_owner_idx ON items (owner)`,
   // One personal password per family member, chosen by them on first sign-in.
@@ -46,6 +47,9 @@ export async function openDb(url: string, authToken?: string): Promise<Client> {
   }
   if (!cols.rows.some((r) => r['name'] === 'multi')) {
     await db.execute('ALTER TABLE items ADD COLUMN multi INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!cols.rows.some((r) => r['name'] === 'favorite')) {
+    await db.execute('ALTER TABLE items ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0');
   }
   // Older databases keyed claims by item_id alone, which only allows one claimer per item.
   const claimCols = await db.execute('PRAGMA table_info(claims)');

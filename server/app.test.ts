@@ -55,6 +55,7 @@ async function login(name: string): Promise<string> {
 const as = (cookie: string) => ({
   get: (url: string) => request(app).get(url).set('Cookie', cookie),
   post: (url: string) => request(app).post(url).set('Cookie', cookie),
+  patch: (url: string) => request(app).patch(url).set('Cookie', cookie),
   delete: (url: string) => request(app).delete(url).set('Cookie', cookie),
 });
 
@@ -80,7 +81,7 @@ describe('privacy: the owner never receives claim data', () => {
       expect(raw).not.toContain('claim');
       expect(raw).not.toContain('michaël');
       expect(Object.keys(res.body.items[0]).sort()).toEqual(
-        ['createdAt', 'id', 'image', 'multi', 'note', 'owner', 'price', 'title', 'url'].sort(),
+        ['createdAt', 'favorite', 'id', 'image', 'multi', 'note', 'owner', 'price', 'title', 'url'].sort(),
       );
     }
   });
@@ -438,6 +439,82 @@ describe('auth', () => {
     const alice = as(await login('Stéphanie'));
     const res = await alice.post('/api/items').set('Origin', 'https://evil.example').send({ title: 'x' });
     expect(res.status).toBe(403);
+  });
+});
+
+describe('editing an item and marking favorites', () => {
+  it('the owner edits any field, and a partial patch leaves the others untouched', async () => {
+    const alice = as(await login('Stéphanie'));
+    const { body } = await alice.post('/api/items').send({ title: 'Socks', price: '10 $', note: 'blue', url: 'https://example.com/s' });
+    const id = body.item.id as number;
+
+    const res = await alice.patch(`/api/items/${id}`).send({ title: 'Wool socks', note: '' });
+    expect(res.status).toBe(200);
+    expect(res.body.item).toMatchObject({ id, title: 'Wool socks', note: null, price: '10 $', url: 'https://example.com/s', favorite: false });
+    expect((await alice.get('/api/items')).body.items[0].title).toBe('Wool socks');
+  });
+
+  it('validates input', async () => {
+    const alice = as(await login('Stéphanie'));
+    const id = (await alice.post('/api/items').send({ title: 'Socks' })).body.item.id as number;
+    expect((await alice.patch(`/api/items/${id}`).send({ title: '' })).status).toBe(400);
+    expect((await alice.patch(`/api/items/${id}`).send({ url: 'javascript:alert(1)' })).status).toBe(400);
+    expect((await alice.patch(`/api/items/${id}`).send({ favorite: 'yes' })).status).toBe(400);
+    expect((await alice.patch(`/api/items/${id}`).send({})).status).toBe(400);
+  });
+
+  it('only the owner (or the manager of a managed list) can edit; others get 404', async () => {
+    const alice = as(await login('Stéphanie'));
+    const bob = as(await login('Michaël'));
+    const id = (await alice.post('/api/items').send({ title: 'Socks' })).body.item.id as number;
+    expect((await bob.patch(`/api/items/${id}`).send({ title: 'Hacked' })).status).toBe(404);
+    expect((await alice.get('/api/items')).body.items[0].title).toBe('Socks');
+
+    const child = (await bob.post('/api/items').send({ title: 'Lego', forName: 'Orélie' })).body.item.id as number;
+    expect((await bob.patch(`/api/items/${child}`).send({ favorite: true })).status).toBe(200);
+    expect((await alice.patch(`/api/items/${child}`).send({ title: 'Hacked' })).status).toBe(404);
+  });
+
+  it('favorites are visible to everyone and sorted first', async () => {
+    const alice = as(await login('Stéphanie'));
+    const bob = as(await login('Michaël'));
+    const first = (await alice.post('/api/items').send({ title: 'First' })).body.item.id as number;
+    await alice.post('/api/items').send({ title: 'Second' });
+    await alice.patch(`/api/items/${first}`).send({ favorite: true });
+
+    for (const who of [alice, bob]) {
+      const items = (await who.get('/api/people/St%C3%A9phanie/items')).body.items;
+      expect(items.map((i: { title: string }) => i.title)).toEqual(['First', 'Second']);
+      expect(items[0].favorite).toBe(true);
+    }
+    await alice.patch(`/api/items/${first}`).send({ favorite: false });
+    expect((await bob.get('/api/people/St%C3%A9phanie/items')).body.items[0].title).toBe('Second');
+  });
+
+  it('editing reveals nothing about claims: same response whether or not the item is claimed, and the claim survives', async () => {
+    const alice = as(await login('Stéphanie'));
+    const bob = as(await login('Michaël'));
+    const plain = (await alice.post('/api/items').send({ title: 'Plain' })).body.item.id as number;
+    const taken = (await alice.post('/api/items').send({ title: 'Taken' })).body.item.id as number;
+    await bob.post(`/api/items/${taken}/claim`);
+
+    const a = await alice.patch(`/api/items/${plain}`).send({ title: 'New', favorite: true });
+    const b = await alice.patch(`/api/items/${taken}`).send({ title: 'New', favorite: true });
+    expect(a.status).toBe(b.status);
+    expect(Object.keys(b.body.item).sort()).toEqual(Object.keys(a.body.item).sort());
+    expect(JSON.stringify(b.body).toLowerCase()).not.toContain('claim');
+
+    const seen = (await bob.get('/api/people/St%C3%A9phanie/items')).body.items;
+    expect(seen.find((i: { id: number }) => i.id === taken)).toMatchObject({ title: 'New', claimed: true, claimedByMe: true });
+  });
+
+  it('a removed item can no longer be edited', async () => {
+    const alice = as(await login('Stéphanie'));
+    const bob = as(await login('Michaël'));
+    const id = (await alice.post('/api/items').send({ title: 'Socks' })).body.item.id as number;
+    await bob.post(`/api/items/${id}/claim`);
+    await alice.delete(`/api/items/${id}`);
+    expect((await alice.patch(`/api/items/${id}`).send({ title: 'Back' })).status).toBe(404);
   });
 });
 

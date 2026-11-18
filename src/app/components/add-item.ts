@@ -1,19 +1,20 @@
-import { Component, computed, input, model, output, signal } from '@angular/core';
+import { Component, computed, input, model, OnInit, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { inject } from '@angular/core';
 import { Api, errorMessage } from '../api';
+import { Item } from '../models';
 
 @Component({
   selector: 'app-add-item',
   imports: [FormsModule],
   template: `
-    @if (!open()) {
+    @if (!open() && !item()) {
       <button type="button" class="add-toggle" (click)="open.set(true)">{{ forName() ? 'Ajouter à la liste ' + deNom() : 'Ajouter à ma liste' }}</button>
     } @else {
     <form class="panel add" (ngSubmit)="submit()" #f="ngForm">
       <div class="panel-head">
-        <h2>Une nouvelle idée</h2>
-        <button type="button" class="link" (click)="open.set(false)">Fermer</button>
+        <h2>{{ item() ? "Modifier l'idée" : 'Une nouvelle idée' }}</h2>
+        <button type="button" class="link" (click)="close()">{{ item() ? 'Annuler' : 'Fermer' }}</button>
       </div>
       <label>
         Lien <span class="hint">(si t'en as un)</span>
@@ -51,18 +52,26 @@ import { Api, errorMessage } from '../api';
         <input type="checkbox" name="multi" [(ngModel)]="multi" />
         A cocher si c'est quelque chose qui se rachète ! Pour que plusieurs puissent l'offrir (carte-cadeau, par exemple)
       </label>
+      <label class="check">
+        <input type="checkbox" name="favorite" [(ngModel)]="favorite" />
+        Coup de cœur ! Ça passe en haut de la liste, avec une étoile
+      </label>
       @if (error()) {
         <p class="error" role="alert">{{ error() }}</p>
       }
-      <button type="submit" [disabled]="!title().trim() || saving()">{{ saving() ? 'Ajout…' : 'Ajouter' }}</button>
+      <button type="submit" [disabled]="!title().trim() || saving()">{{ submitLabel() }}</button>
     </form>
     }
   `,
 })
-export class AddItem {
+export class AddItem implements OnInit {
   private api = inject(Api);
   added = output<void>();
   open = model(false);
+  /** Set to edit an existing idea instead of adding one. */
+  item = input<Item | null>(null);
+  saved = output<void>();
+  cancelled = output<void>();
   /** Set when adding to the list of someone you manage. */
   forName = input('');
   deNom = computed(() => (/^[aeiouyhàâéèêëîïôù]/i.test(this.forName()) ? "d'" : 'de ') + this.forName());
@@ -72,12 +81,36 @@ export class AddItem {
   price = signal('');
   note = signal('');
   multi = signal(false);
+  favorite = signal(false);
   image = signal('');
   fetching = signal(false);
   saving = signal(false);
   error = signal('');
   hint = signal('');
   private fetchedFor = '';
+
+  protected submitLabel = computed(() => {
+    if (this.item()) return this.saving() ? 'Enregistrement…' : 'Enregistrer';
+    return this.saving() ? 'Ajout…' : 'Ajouter';
+  });
+
+  ngOnInit() {
+    const it = this.item();
+    if (!it) return;
+    this.title.set(it.title);
+    this.url.set(it.url ?? '');
+    this.image.set(it.image ?? '');
+    this.price.set(it.price ?? '');
+    this.note.set(it.note ?? '');
+    this.multi.set(!!it.multi);
+    this.favorite.set(!!it.favorite);
+    this.fetchedFor = (it.url ?? '').trim();
+  }
+
+  close() {
+    if (this.item()) this.cancelled.emit();
+    else this.open.set(false);
+  }
 
   onPaste() {
     setTimeout(() => this.fetchDetails());
@@ -112,6 +145,20 @@ export class AddItem {
     this.saving.set(true);
     this.error.set('');
     try {
+      const existing = this.item();
+      if (existing) {
+        await this.api.updateItem(existing.id, {
+          title: this.title().trim(),
+          url: this.url().trim(),
+          image: this.image(),
+          price: this.price().trim(),
+          note: this.note().trim(),
+          multi: this.multi(),
+          favorite: this.favorite(),
+        });
+        this.saved.emit();
+        return;
+      }
       await this.api.addItem({
         title: this.title().trim(),
         url: this.url().trim() || undefined,
@@ -120,8 +167,10 @@ export class AddItem {
         note: this.note().trim() || undefined,
         forName: this.forName() || undefined,
         multi: this.multi() || undefined,
+        favorite: this.favorite() || undefined,
       });
       this.multi.set(false);
+      this.favorite.set(false);
       for (const s of [this.url, this.title, this.price, this.note, this.image, this.hint]) s.set('');
       this.fetchedFor = '';
       this.open.set(false);

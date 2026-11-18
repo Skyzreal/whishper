@@ -24421,21 +24421,22 @@ function toOwnItem(row) {
     price: row["price"] ?? null,
     note: row["note"] ?? null,
     multi: Number(row["multi"]) === 1,
+    favorite: Number(row["favorite"]) === 1,
     createdAt: String(row["created_at"])
   };
 }
 async function getListForViewer(db, viewer, owner) {
   if (viewer === owner) {
     const res2 = await db.execute({
-      sql: "SELECT id, owner, title, url, image, price, note, multi, created_at FROM items WHERE owner = ? AND deleted_at IS NULL ORDER BY id DESC",
+      sql: "SELECT id, owner, title, url, image, price, note, multi, favorite, created_at FROM items WHERE owner = ? AND deleted_at IS NULL ORDER BY favorite DESC, id DESC",
       args: [owner]
     });
     return res2.rows.map((r) => toOwnItem(r));
   }
   const res = await db.execute({
-    sql: `SELECT i.id, i.owner, i.title, i.url, i.image, i.price, i.note, i.multi, i.created_at, c.claimer AS claimer
+    sql: `SELECT i.id, i.owner, i.title, i.url, i.image, i.price, i.note, i.multi, i.favorite, i.created_at, c.claimer AS claimer
           FROM items i LEFT JOIN claims c ON c.item_id = i.id
-          WHERE i.owner = ? AND i.deleted_at IS NULL ORDER BY i.id DESC, c.created_at, c.claimer`,
+          WHERE i.owner = ? AND i.deleted_at IS NULL ORDER BY i.favorite DESC, i.id DESC, c.created_at, c.claimer`,
     args: [owner]
   });
   const byId = /* @__PURE__ */ new Map();
@@ -24461,11 +24462,34 @@ async function countItemsByOwner(db) {
 }
 async function addItem(db, owner, input) {
   const res = await db.execute({
-    sql: `INSERT INTO items (owner, title, url, image, price, note, multi) VALUES (?, ?, ?, ?, ?, ?, ?)
-          RETURNING id, owner, title, url, image, price, note, multi, created_at`,
-    args: [owner, input.title, input.url ?? null, input.image ?? null, input.price ?? null, input.note ?? null, input.multi ? 1 : 0]
+    sql: `INSERT INTO items (owner, title, url, image, price, note, multi, favorite) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          RETURNING id, owner, title, url, image, price, note, multi, favorite, created_at`,
+    args: [owner, input.title, input.url ?? null, input.image ?? null, input.price ?? null, input.note ?? null, input.multi ? 1 : 0, input.favorite ? 1 : 0]
   });
   return toOwnItem(res.rows[0]);
+}
+async function updateOwnItem(db, owners, itemId2, patch) {
+  const sets = [];
+  const args = [];
+  const set = (column, value) => {
+    sets.push(`${column} = ?`);
+    args.push(value);
+  };
+  if (patch.title !== void 0) set("title", patch.title);
+  if (patch.url !== void 0) set("url", patch.url);
+  if (patch.image !== void 0) set("image", patch.image);
+  if (patch.price !== void 0) set("price", patch.price);
+  if (patch.note !== void 0) set("note", patch.note);
+  if (patch.multi !== void 0) set("multi", patch.multi ? 1 : 0);
+  if (patch.favorite !== void 0) set("favorite", patch.favorite ? 1 : 0);
+  if (!sets.length) throw new HttpError(400, "Rien \xE0 modifier");
+  const res = await db.execute({
+    sql: `UPDATE items SET ${sets.join(", ")}
+          WHERE id = ? AND owner IN (${owners.map(() => "?").join(",")}) AND deleted_at IS NULL
+          RETURNING id, owner, title, url, image, price, note, multi, favorite, created_at`,
+    args: [...args, itemId2, ...owners]
+  });
+  return res.rows.length ? toOwnItem(res.rows[0]) : null;
 }
 async function deleteOwnItem(db, owners, itemId2) {
   const tx = await db.transaction("write");
@@ -24519,7 +24543,7 @@ async function unclaimItem(db, viewer, itemId2) {
 }
 async function listReservations(db, viewer) {
   const res = await db.execute({
-    sql: `SELECT i.id, i.owner, i.title, i.url, i.image, i.price, i.note, i.multi, i.created_at, i.deleted_at
+    sql: `SELECT i.id, i.owner, i.title, i.url, i.image, i.price, i.note, i.multi, i.favorite, i.created_at, i.deleted_at
           FROM claims c JOIN items i ON i.id = c.item_id
           WHERE c.claimer = ? ORDER BY i.owner, i.id DESC`,
     args: [viewer]
@@ -25085,9 +25109,30 @@ function createApp({ config, getDb, fetchPreview: fetchPreview2 = fetchPreview }
       image: webUrl(body.image, "L'image"),
       price: text(body.price, 50, "Le prix"),
       note: text(body.note, 1e3, "La note"),
-      multi: body.multi === true
+      multi: body.multi === true,
+      favorite: body.favorite === true
     });
     res.status(201).json({ item });
+  });
+  api.patch("/items/:id", requireUser, async (req, res) => {
+    const user = req.user;
+    const body = req.body ?? {};
+    const has = (k) => body[k] !== void 0;
+    const flag = (k) => {
+      if (typeof body[k] !== "boolean") throw new HttpError(400, `${k} doit \xEAtre vrai ou faux`);
+      return body[k];
+    };
+    const patch = {};
+    if (has("title")) patch.title = text(body.title, 200, "Le titre", true);
+    if (has("url")) patch.url = webUrl(body.url, "Le lien");
+    if (has("image")) patch.image = webUrl(body.image, "L'image");
+    if (has("price")) patch.price = text(body.price, 50, "Le prix");
+    if (has("note")) patch.note = text(body.note, 1e3, "La note");
+    if (has("multi")) patch.multi = flag("multi");
+    if (has("favorite")) patch.favorite = flag("favorite");
+    const item = await updateOwnItem(await getDb(), [user, ...managedBy(user)], itemId(req), patch);
+    if (!item) throw new HttpError(404, "Cadeau introuvable");
+    res.json({ item });
   });
   api.delete("/items/:id", requireUser, async (req, res) => {
     const user = req.user;
@@ -25142,7 +25187,8 @@ var SCHEMA = [
     note       TEXT,
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     deleted_at TEXT,
-    multi      INTEGER NOT NULL DEFAULT 0
+    multi      INTEGER NOT NULL DEFAULT 0,
+    favorite   INTEGER NOT NULL DEFAULT 0
   )`,
   `CREATE INDEX IF NOT EXISTS items_owner_idx ON items (owner)`,
   // One personal password per family member, chosen by them on first sign-in.
@@ -25173,6 +25219,9 @@ async function openDb(url, authToken) {
   }
   if (!cols.rows.some((r) => r["name"] === "multi")) {
     await db.execute("ALTER TABLE items ADD COLUMN multi INTEGER NOT NULL DEFAULT 0");
+  }
+  if (!cols.rows.some((r) => r["name"] === "favorite")) {
+    await db.execute("ALTER TABLE items ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0");
   }
   const claimCols = await db.execute("PRAGMA table_info(claims)");
   if (!claimCols.rows.some((r) => r["name"] === "claimer" && Number(r["pk"]) > 0)) {

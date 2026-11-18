@@ -12,6 +12,8 @@ export interface Item {
   claimedByMe?: boolean;
   /** Several people can reserve it. */
   multi?: boolean;
+  /** The owner especially wants this one; shown first with a star. */
+  favorite?: boolean;
   /** Names of everyone who reserved a multi item (never filled for other items). */
   claimers?: string[];
   /** Only on the reservations page: the owner took this item off their list. */
@@ -41,8 +43,20 @@ export interface NewItem {
   price?: string;
   note?: string;
   multi?: boolean;
+  favorite?: boolean;
   /** Add to the list of someone whose list you manage, instead of your own. */
   forName?: string;
+}
+
+/** Empty strings clear a field; a missing key leaves it unchanged. */
+export interface ItemPatch {
+  title?: string;
+  url?: string;
+  image?: string;
+  price?: string;
+  note?: string;
+  multi?: boolean;
+  favorite?: boolean;
 }
 
 export interface PersonList {

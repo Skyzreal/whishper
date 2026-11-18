@@ -5,7 +5,7 @@ import { Item } from '../models';
   selector: 'app-item-card',
   template: `
     @let i = item();
-    <article class="card" [class.taken]="mode() === 'other' && i.claimed && !i.claimedByMe" [class.mine]="mode() === 'other' && i.claimedByMe" [class.removed]="i.removed">
+    <article class="card" [class.fav]="i.favorite" [class.taken]="mode() === 'other' && i.claimed && !i.claimedByMe" [class.mine]="mode() === 'other' && i.claimedByMe" [class.removed]="i.removed">
       <div class="thumb">
         @if (i.image) {
           <img [src]="i.image" alt="" loading="lazy" referrerpolicy="no-referrer" />
@@ -14,7 +14,12 @@ import { Item } from '../models';
         }
       </div>
       <div class="body">
-        <h3>{{ i.title }}</h3>
+        <h3>
+          @if (i.favorite) {
+            <svg class="fav-mark" viewBox="0 0 24 24" role="img" aria-label="Coup de cœur"><path d="M12 2.8l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.6l-5.9 3.2 1.2-6.5L2.5 9.7l6.6-.9z"/></svg>
+          }
+          {{ i.title }}
+        </h3>
         @if (i.price) {
           <p class="price">{{ i.price }}</p>
         }
@@ -31,8 +36,14 @@ import { Item } from '../models';
           <a class="external" [href]="i.url" target="_blank" rel="noopener noreferrer">{{ host() }} ↗</a>
         }
       </div>
-      <div class="actions">
+      <div class="actions" [class.own]="mode() === 'own'">
         @if (mode() === 'own') {
+          <button type="button" class="fav-toggle" [class.on]="i.favorite" [attr.aria-pressed]="!!i.favorite"
+            [attr.aria-label]="i.favorite ? 'Retirer des coups de cœur' : 'Marquer comme coup de cœur'"
+            (click)="toggleFavorite.emit(i)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.6l-5.9 3.2 1.2-6.5L2.5 9.7l6.6-.9z"/></svg>
+          </button>
+          <button type="button" class="tool" (click)="edit.emit(i)">Modifier</button>
           <button type="button" class="danger" (click)="remove.emit(i)">Retirer</button>
         } @else if (mode() === 'reservation') {
           @if (i.removed) {
@@ -61,6 +72,8 @@ export class ItemCard {
   claim = output<Item>();
   unclaim = output<Item>();
   remove = output<Item>();
+  edit = output<Item>();
+  toggleFavorite = output<Item>();
 
   protected initial = computed(() => Array.from(this.item().title.trim())[0]?.toLocaleUpperCase('fr') ?? '');
 

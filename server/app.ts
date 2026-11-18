@@ -10,6 +10,8 @@ import {
   getListForViewer,
   listReservations,
   unclaimItem,
+  updateOwnItem,
+  type ItemPatch,
 } from './items';
 import { MIN_PASSWORD_LENGTH, getPasswordHash, registeredNames, replacePassword, setInitialPassword, verifyPassword } from './password';
 import { fetchPreview as defaultFetchPreview, type Preview } from './scrape';
@@ -252,8 +254,30 @@ export function createApp({ config, getDb, fetchPreview = defaultFetchPreview }:
       price: text(body.price, 50, 'Le prix'),
       note: text(body.note, 1000, 'La note'),
       multi: body.multi === true,
+      favorite: body.favorite === true,
     });
     res.status(201).json({ item });
+  });
+
+  api.patch('/items/:id', requireUser, async (req, res) => {
+    const user = (req as AuthedRequest).user;
+    const body = req.body ?? {};
+    const has = (k: string) => body[k] !== undefined;
+    const flag = (k: string) => {
+      if (typeof body[k] !== 'boolean') throw new HttpError(400, `${k} doit être vrai ou faux`);
+      return body[k] as boolean;
+    };
+    const patch: ItemPatch = {};
+    if (has('title')) patch.title = text(body.title, 200, 'Le titre', true)!;
+    if (has('url')) patch.url = webUrl(body.url, 'Le lien');
+    if (has('image')) patch.image = webUrl(body.image, "L'image");
+    if (has('price')) patch.price = text(body.price, 50, 'Le prix');
+    if (has('note')) patch.note = text(body.note, 1000, 'La note');
+    if (has('multi')) patch.multi = flag('multi');
+    if (has('favorite')) patch.favorite = flag('favorite');
+    const item = await updateOwnItem(await getDb(), [user, ...managedBy(user)], itemId(req), patch);
+    if (!item) throw new HttpError(404, 'Cadeau introuvable');
+    res.json({ item });
   });
 
   api.delete('/items/:id', requireUser, async (req, res) => {

@@ -136,6 +136,19 @@ button.link.forgot { display: block; margin: 0.75rem auto 0; color: var(--red); 
 .card.taken .thumb, .card.taken .body { opacity: 0.55; }
 .card.taken h3 { text-decoration: line-through; text-decoration-thickness: 1px; }
 .card.removed { opacity: 0.65; font-style: italic; }
+.card.fav { background: linear-gradient(90deg, var(--gold-soft), transparent 70%); box-shadow: inset 3px 0 0 var(--gold); padding-left: 0.75rem; }
+.fav-mark { width: 0.95em; height: 0.95em; fill: var(--gold); vertical-align: -0.08em; margin-right: 0.15rem; }
+button.fav-toggle {
+  background: none; border: 0; padding: 0.3rem; color: var(--muted); line-height: 0;
+  display: inline-grid; place-items: center;
+}
+button.fav-toggle svg { width: 1.3rem; height: 1.3rem; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; }
+button.fav-toggle:hover:not(:disabled) { background: none; color: var(--gold); }
+button.fav-toggle.on { color: var(--gold); }
+button.fav-toggle.on svg { fill: var(--gold); }
+button.tool { background: none; border: 0; color: var(--brand); text-decoration: underline; padding: 0.3rem 0.2rem; font-weight: 400; }
+button.tool:hover:not(:disabled) { background: none; color: var(--btn-dark); }
+.actions.own { flex-direction: row; align-items: center; justify-content: flex-end; gap: 0.5rem; }
 .reservation-group { margin-top: 2rem; }
 .group-head { display: flex; align-items: center; gap: 0.6rem; margin: 0 0 0.6rem; }
 .group-head a { color: var(--ink); text-decoration: none; }
@@ -226,7 +239,9 @@ label.check input { width: auto; margin: 0; }
   .actions button { flex: 1; }
   .actions .badge { flex: 1; text-align: left; }
   .card .actions:has(> button.danger) { justify-content: flex-start; margin-top: -0.6rem; }
-  .card .actions > button.danger { flex: 0 0 auto; min-height: 36px; }
+  .card .actions > button.danger, .card .actions.own > button { flex: 0 0 auto; min-height: 36px; }
+  .actions.own { gap: 0.9rem; }
+  .card .actions.own > button.fav-toggle { min-width: 36px; }
 
   .grid { grid-template-columns: repeat(2, 1fr); }
 

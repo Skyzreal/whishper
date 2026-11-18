@@ -1,7 +1,7 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { Item, NewItem, PersonList, Person, Preview } from './models';
+import { Item, ItemPatch, NewItem, PersonList, Person, Preview } from './models';
 
 export function errorMessage(e: unknown): string {
   const fallback = 'Une erreur est survenue. Réessaie.';
@@ -34,6 +34,7 @@ export class Api {
 
   addItem = (item: NewItem) => firstValueFrom(this.http.post<{ item: Item }>('/api/items', item));
   removeItem = (id: number) => firstValueFrom(this.http.delete(`/api/items/${id}`));
+  updateItem = (id: number, patch: ItemPatch) => firstValueFrom(this.http.patch<{ item: Item }>(`/api/items/${id}`, patch));
   preview = (url: string) => firstValueFrom(this.http.post<Preview>('/api/preview', { url }));
 
   claim = (id: number) => firstValueFrom(this.http.post(`/api/items/${id}/claim`, {}));

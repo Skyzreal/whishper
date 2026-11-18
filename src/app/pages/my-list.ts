@@ -38,7 +38,11 @@ import { Item } from '../models';
 
     <div class="list">
       @for (item of items(); track item.id) {
-        <app-item-card [item]="item" mode="own" (remove)="remove($event)" />
+        @if (editingId() === item.id) {
+          <app-add-item [item]="item" (saved)="saved()" (cancelled)="editingId.set(null)" />
+        } @else {
+          <app-item-card [item]="item" mode="own" (remove)="remove($event)" (edit)="editingId.set($event.id)" (toggleFavorite)="toggleFavorite($event)" />
+        }
       } @empty {
         @if (loaded()) {
           <p class="empty">Wow ! C'est vide ici !</p>
@@ -56,6 +60,21 @@ export class MyList implements OnInit {
   items = signal<Item[]>([]);
   managed = signal<string[]>([]);
   addedFor = signal('');
+  editingId = signal<number | null>(null);
+
+  protected async saved() {
+    this.editingId.set(null);
+    await this.load();
+  }
+
+  protected async toggleFavorite(item: Item) {
+    try {
+      await this.api.updateItem(item.id, { favorite: !item.favorite });
+      await this.load();
+    } catch (e) {
+      this.error.set(errorMessage(e));
+    }
+  }
 
   protected deNom(name: string) {
     return (/^[aeiouyhàâéèêëîïôù]/i.test(name) ? "d'" : 'de ') + name;

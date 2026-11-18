@@ -41,11 +41,15 @@ Côté technique : s'il y a une réservation, deleteOwnItem ne supprime pas la l
 ### Cadeaux que plusieurs personnes peuvent offrir
 
 Pour une carte-cadeau, par exemple, coche **« Plusieurs personnes peuvent l'offrir »** en l'ajoutant. Cet élément reste disponible : chacun peut cliquer sur **« Je m'en occupe »**, et les autres membres de la famille voient **qui** y participe (« Déjà prévu par Jade, Marie »). La personne concernée, elle, ne voit toujours rien : la liste qu'elle reçoit contient seulement l'indication que le cadeau est partageable, jamais de réservation ni de nom.
-Les cadeaux ordinaires restent à un seul preneur, et on n'y voit jamais le nom de la personne. Il faut cocher l'option à l'ajout : pour changer un cadeau existant, retire-le et ajoute-le de nouveau. Les bases de données existantes sont mises à jour automatiquement au démarrage.
+Les cadeaux ordinaires restent à un seul preneur, et on n'y voit jamais le nom de la personne. L'option se coche à l'ajout ou plus tard avec **« Modifier »**. Les bases de données existantes sont mises à jour automatiquement au démarrage.
+
+### Modifier une idée et les coups de cœur
+
+Sur **Ma liste**, chaque idée a un bouton **« Modifier »** (titre, lien, image, prix, précisions, option « plusieurs personnes ») et une étoile **★**. Une idée marquée **coup de cœur** passe en haut de la liste avec une étoile dorée, visible par toute la famille. La modification (`PATCH /api/items/:id`) renvoie la même réponse que l'idée soit réservée ou non, et ne touche jamais aux réservations : la personne concernée n'apprend rien. Le parent qui gère la liste d'un enfant peut aussi modifier et marquer des coups de cœur.
 
 ### Gérer la liste d'un enfant
 
-Avec `MANAGED_MEMBERS=Orélie:François`, Orélie n'a pas de compte : François va sur sa fiche dans **Famille** et peut y **ajouter** et **retirer** des idées à sa place. Le prénom d'Orélie n'apparaît plus sur la page de connexion, et la connexion à son nom est refusée.
+Avec `MANAGED_MEMBERS=Orélie:François`, Orélie n'a pas de compte : François va sur sa fiche dans **Famille** et peut y **ajouter**, **modifier** et **retirer** des idées à sa place. Le prénom d'Orélie n'apparaît plus sur la page de connexion, et la connexion à son nom est refusée.
 Le parent voit la liste comme le ferait son propriétaire : aucune information sur les réservations, et il ne peut pas réserver sur cette liste. Les autres membres de la famille la voient et réservent normalement. Pour que l'enfant ait son propre compte plus tard, retire simplement son entrée de `MANAGED_MEMBERS`.
 
 ## Technologies

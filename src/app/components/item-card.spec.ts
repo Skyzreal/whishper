@@ -22,11 +22,21 @@ function render(item: Item, mode: 'own' | 'other' | 'reservation'): HTMLElement 
 }
 
 describe('ItemCard', () => {
-  it('shows only a remove button on your own list, even if claim flags leak in', () => {
+  it('shows only own-list actions (favorite, edit, remove), even if claim flags leak in', () => {
     const el = render({ ...base, claimed: true, claimedByMe: false }, 'own');
     expect(el.textContent).not.toMatch(/réservé|occupe|occupes/i);
     expect(el.querySelector('.card.taken')).toBeNull();
-    expect(Array.from(el.querySelectorAll('button')).map((b) => b.textContent?.trim())).toEqual(['Retirer']);
+    expect(Array.from(el.querySelectorAll('button')).map((b) => b.textContent?.trim())).toEqual(['', 'Modifier', 'Retirer']);
+  });
+
+  it('marks favorites with a star for everyone', () => {
+    const own = render({ ...base, favorite: true }, 'own');
+    expect(own.querySelector('.card.fav .fav-mark')).not.toBeNull();
+    expect(own.querySelector('.fav-toggle')?.getAttribute('aria-pressed')).toBe('true');
+    const other = render({ ...base, favorite: true, claimed: false, claimedByMe: false }, 'other');
+    expect(other.querySelector('.card.fav .fav-mark')).not.toBeNull();
+    expect(other.querySelector('.fav-toggle')).toBeNull();
+    expect(render({ ...base }, 'own').querySelector('.fav-mark')).toBeNull();
   });
 
   it('lets others claim an unclaimed item', () => {
