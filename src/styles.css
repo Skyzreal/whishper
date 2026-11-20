@@ -360,6 +360,38 @@ label.check input { width: auto; margin: 0; }
   animation-duration: 34s;
 }
 @keyframes snow-fall { to { transform: translateY(300px); } }
+
+/* Compte à rebours de Noël sur la page de connexion. */
+.xmas {
+  position: relative; margin: 1.1rem 0 1.25rem; padding: 1.1rem 0.75rem 0.8rem; text-align: center;
+  background: var(--gold-soft); border: 1px dashed var(--gold); border-radius: 12px;
+}
+.xmas-star {
+  position: absolute; top: -0.85rem; left: 50%; margin-left: -0.9rem; width: 1.8rem; height: 1.8rem;
+  display: grid; place-items: center; border-radius: 50%; background: var(--paper); color: var(--gold);
+  font-size: 1.2rem; line-height: 1; border: 1px solid var(--gold);
+  animation: xmas-twinkle 2.4s ease-in-out infinite;
+}
+.xmas-title { margin: 0 0 0.65rem; font-family: var(--serif); font-size: 1.05rem; color: var(--red-dark); }
+.xmas-tiles { display: flex; justify-content: center; gap: 0.5rem; }
+.xmas-tile {
+  flex: 0 1 4.2rem; display: flex; flex-direction: column; align-items: center; padding: 0.4rem 0.2rem 0.35rem;
+  background: radial-gradient(circle at 30% 25%, #c63a40, var(--red) 55%, var(--red-dark)); color: #fff;
+  border-radius: 10px; border-top: 4px solid var(--gold); box-shadow: 0 2px 4px rgba(127, 29, 34, 0.3);
+  transform-origin: 50% -6px;
+  animation: xmas-swing 4s ease-in-out infinite;
+}
+.xmas-tile:nth-child(even) { background: radial-gradient(circle at 30% 25%, #2f8a5a, var(--pine) 55%, var(--pine-dark)); animation-delay: -2s; }
+.xmas-tile:nth-child(2) { animation-delay: -1s; }
+.xmas-tile:nth-child(3) { animation-delay: -3s; }
+.xmas-tile strong { font-family: var(--serif); font-weight: 400; font-size: 1.5rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.xmas-tile span { font-size: 0.75rem; letter-spacing: 0.02em; }
+@keyframes xmas-swing { 0%, 100% { transform: rotate(-2.5deg); } 50% { transform: rotate(2.5deg); } }
+@keyframes xmas-twinkle { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.18) rotate(12deg); opacity: 0.75; } }
+@media (max-width: 380px) { .xmas-tiles { gap: 0.35rem; } .xmas-tile strong { font-size: 1.3rem; } }
+@media (prefers-reduced-motion: reduce) {
+  .xmas-star, .xmas-tile { animation: none; }
+}
 @media (prefers-reduced-motion: reduce) {
   .snow::before, .snow::after { animation: none; }
 }
