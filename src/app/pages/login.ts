@@ -4,18 +4,16 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Api, errorMessage } from '../api';
 import { Auth } from '../auth';
-import { ChristmasCountdown } from '../components/christmas-countdown';
 
 @Component({
   selector: 'app-login',
-  imports: [FormsModule, ChristmasCountdown],
+  imports: [FormsModule],
   template: `
     <div class="snow" aria-hidden="true"></div>
     <section class="panel login">
       <img src="logo.png" alt="Whishper" class="login-logo" width="72" height="72">
       <h1>Temps de Noël !!</h1>
       <p class="lead">Les listes de souhaits de la famille. Choisit ton nom dans la liste !</p>
-      <app-christmas-countdown />
       <form (ngSubmit)="submit()">
         <label>
           Qui es-tu ?
