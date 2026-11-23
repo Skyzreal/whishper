@@ -1,6 +1,5 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component } from '@angular/core';
 import { RELEASES, formatReleaseDate } from '../release-notes';
-import { WhatsNew } from '../whats-new';
 
 @Component({
   selector: 'app-news',
@@ -32,12 +31,7 @@ import { WhatsNew } from '../whats-new';
     </div>
   `,
 })
-export class News implements OnInit {
-  private whatsNew = inject(WhatsNew);
+export class News {
   protected releases = RELEASES;
   protected date = formatReleaseDate;
-
-  ngOnInit() {
-    this.whatsNew.markSeen();
-  }
 }

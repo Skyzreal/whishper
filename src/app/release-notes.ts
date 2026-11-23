@@ -1,5 +1,5 @@
 export interface Release {
-  /** Shown as « v1.2 ». Changing it is what makes the « nouveau » dot reappear on everyone's device. */
+  /** Shown as « v1.2 ». */
   version: string;
   /** YYYY-MM-DD */
   date: string;
@@ -70,11 +70,6 @@ export const RELEASES: readonly Release[] = [
 ];
 
 export const LATEST_VERSION = RELEASES[0].version;
-
-/** True when the person has never opened the news, or opened them before the latest version came out. */
-export function hasUnseen(seenVersion: string | null, latest: string = LATEST_VERSION): boolean {
-  return seenVersion !== latest;
-}
 
 export function formatReleaseDate(date: string): string {
   return new Date(`${date}T12:00:00`).toLocaleDateString('fr-CA', { day: 'numeric', month: 'long', year: 'numeric' });

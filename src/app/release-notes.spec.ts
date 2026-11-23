@@ -1,6 +1,8 @@
 import { TestBed } from '@angular/core/testing';
-import { hasUnseen, LATEST_VERSION, RELEASES } from './release-notes';
-import { WhatsNew } from './whats-new';
+import { provideRouter } from '@angular/router';
+import { App } from './app';
+import { Auth } from './auth';
+import { LATEST_VERSION, RELEASES } from './release-notes';
 import { News } from './pages/news';
 
 describe('release notes', () => {
@@ -12,21 +14,23 @@ describe('release notes', () => {
     expect(RELEASES.every((r) => r.notes.length > 0)).toBe(true);
   });
 
-  it('shows the dot until the latest version has been seen', () => {
-    expect(hasUnseen(null)).toBe(true);
-    expect(hasUnseen('0.9')).toBe(true);
-    expect(hasUnseen(LATEST_VERSION)).toBe(false);
-    expect(hasUnseen('1.0', '1.1')).toBe(true);
-  });
-
-  it('remembers the seen version on this device when the page is opened', () => {
-    localStorage.clear();
+  it('renders the latest version at the top of the page', () => {
     const fixture = TestBed.createComponent(News);
-    expect(TestBed.inject(WhatsNew).unseen()).toBe(true);
     fixture.detectChanges();
     const versions = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.ver')).map((e) => e.textContent?.trim());
     expect(versions[0]).toBe(`v${LATEST_VERSION}`);
-    expect(TestBed.inject(WhatsNew).unseen()).toBe(false);
-    expect(localStorage.getItem('whishper:seen-version')).toBe(LATEST_VERSION);
+    expect(versions.length).toBe(RELEASES.length);
+  });
+
+  it('links to the news from the page footer only, not from the navigation', () => {
+    TestBed.configureTestingModule({
+      providers: [provideRouter([]), { provide: Auth, useValue: { user: () => 'Jade', logout: async () => {} } }],
+    });
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.site-foot a[href="/news"]')).not.toBeNull();
+    expect(el.querySelectorAll('a[href="/news"]').length).toBe(1);
+    expect(el.querySelector('nav a[href="/news"]')).toBeNull();
   });
 });

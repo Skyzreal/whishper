@@ -163,13 +163,13 @@ Amazon surtout, affichent une page de vérification anti-robot au lieu du produi
 
 ## Publier des notes de version
 
-La page **✨ Nouveautés** (dans la nav sur PC, pastille ✨ en haut sur mobile) liste ce qui a changé, de la version la plus récente à la plus ancienne. Une petite pastille rouge signale une version que la personne n'a pas encore vue (mémorisé par appareil dans le `localStorage`, rien côté serveur).
+La page **✨ Nouveautés** liste ce qui a changé, de la version la plus récente à la plus ancienne. Volontairement discrète : un petit lien tout en bas de chaque page (il faut défiler pour le voir), ni dans la nav ni de pastille.
 
 Tout le contenu est dans **un seul fichier** : `src/app/release-notes.ts`. Pour publier une version, ajoute un bloc **en haut** de `RELEASES` :
 
 ```ts
 {
-  version: '1.5',          // doit être nouveau : c'est ce qui rallume la pastille chez tout le monde
+  version: '1.5',          // doit être nouveau
   date: '2026-12-01',
   title: 'Un titre sympa',
   notes: ['Tu peux maintenant …', 'Autre nouveauté visible par la famille.'],
