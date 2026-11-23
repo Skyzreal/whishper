@@ -146,7 +146,7 @@ L'interface est pensée pour le téléphone : sur un petit écran, une barre d'o
 
 ### Photos
 
-Sur **Ma liste**, **« Ajouter une photo »** ouvre la galerie ou l'appareil photo du téléphone (sur un ordinateur : le sélecteur de fichiers, ou colle directement une image avec Ctrl+V). Une idée peut n'avoir **qu'une photo** : le titre est alors facultatif et la carte s'appelle *« Idée cadeau »*. Il faut seulement au moins un titre, un lien ou une photo. Tu peux retirer ou remplacer la photo avec **Modifier**; une photo ajoutée a priorité sur l'image d'un aperçu de lien (qui revient si tu la retires).
+Sur **Ma liste**, **« Ajouter une photo »** ouvre la galerie ou l'appareil photo du téléphone (sur un ordinateur : le sélecteur de fichiers, **glisser-déposer** d'une image sur le formulaire, ou Ctrl+V pour coller une image). Une idée peut n'avoir **qu'une photo** : le titre est alors facultatif et la carte s'appelle *« Idée cadeau »*. Il faut seulement au moins un titre, un lien ou une photo. Tu peux retirer ou remplacer la photo avec **Modifier**; une photo ajoutée a priorité sur l'image d'un aperçu de lien (qui revient si tu la retires).
 
 - **Stockage :** pas de disque (Vercel n'en a pas), tout est dans la base de données, dans une table `item_pictures` séparée pour que les listes restent légères. Aucun service payant.
 - **Limites :** le navigateur réduit la photo (1000 px max, JPEG, environ 300 Ko ou moins) avant l'envoi ; le serveur refuse tout ce qui dépasse 400 Ko, qui n'est pas du JPEG, PNG, WebP ou GIF (pas de SVG) ou dont le contenu réel ne correspond pas au type annoncé (vérification des premiers octets). Les écritures d'idées acceptent un corps de 700 Ko au plus (20 Ko ailleurs).

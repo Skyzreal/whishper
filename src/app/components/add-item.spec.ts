@@ -60,6 +60,28 @@ describe('AddItem in edit mode', () => {
     expect(cmp.photo()).toBeNull();
   });
 
+  it('accepts dragged files: prevents the browser default and rejects non-images', () => {
+    TestBed.configureTestingModule({ providers: [{ provide: Api, useValue: {} }] });
+    const fixture = TestBed.createComponent(AddItem);
+    const cmp = fixture.componentInstance;
+    cmp.open.set(true);
+    fixture.detectChanges();
+    const form = fixture.nativeElement.querySelector('form') as HTMLFormElement;
+    const drag = (type: string, file?: File) => {
+      const e = new Event(type, { bubbles: true, cancelable: true });
+      Object.defineProperty(e, 'dataTransfer', { value: { types: ['Files'], files: file ? [file] : [], dropEffect: '' } });
+      form.dispatchEvent(e);
+      return e;
+    };
+
+    expect(drag('dragover').defaultPrevented).toBe(true);
+    expect(cmp.dragging()).toBe(true);
+    expect(drag('drop', new File(['x'], 'a.txt', { type: 'text/plain' })).defaultPrevented).toBe(true);
+    expect(cmp.dragging()).toBe(false);
+    expect(cmp.photoError()).toContain("pas une image");
+    expect(cmp.photo()).toBeNull();
+  });
+
   it('removes the uploaded picture of an item, and leaves it alone otherwise', async () => {
     const updateItem = vi.fn().mockResolvedValue({});
     TestBed.configureTestingModule({ providers: [{ provide: Api, useValue: { updateItem } }] });

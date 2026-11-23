@@ -131,6 +131,9 @@ button.photo-btn {
   background: var(--paper); color: var(--btn); border: 2px dashed var(--btn); border-radius: 10px;
 }
 button.photo-btn:hover:not(:disabled) { background: #e8f1ea; color: var(--btn-dark); border-color: var(--btn-dark); }
+.photo.dragging button.photo-btn { background: #e8f1ea; border-color: var(--btn-dark); color: var(--btn-dark); }
+.drop-hint { display: none; margin: -0.3rem 0 0; text-align: center; font-size: 0.85rem; color: var(--muted, #6b6558); }
+@media (hover: hover) and (pointer: fine) { .drop-hint { display: block; } }
 button.camera-link { display: none; align-self: center; }
 @media (pointer: coarse) { button.camera-link { display: inline-block; } }
 .photo-preview { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; }

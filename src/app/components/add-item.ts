@@ -12,12 +12,13 @@ import { compressImage } from '../image-compress';
     @if (!open() && !item()) {
       <button type="button" class="add-toggle" (click)="open.set(true)">{{ forName() ? 'Ajouter à la liste ' + deNom() : 'Ajouter à ma liste' }}</button>
     } @else {
-    <form class="panel add" (ngSubmit)="submit()" (paste)="onFormPaste($event)" #f="ngForm">
+    <form class="panel add" (ngSubmit)="submit()" (paste)="onFormPaste($event)"
+      (dragover)="onDragOver($event)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event)" #f="ngForm">
       <div class="panel-head">
         <h2>{{ item() ? "Modifier l'idée" : 'Une nouvelle idée' }}</h2>
         <button type="button" class="link" (click)="close()">{{ item() ? 'Annuler' : 'Fermer' }}</button>
       </div>
-      <div class="photo">
+      <div class="photo" [class.dragging]="dragging()">
         @if (previewPicture()) {
           <div class="photo-preview">
             <img [src]="previewPicture()" alt="Aperçu de ta photo" />
@@ -25,8 +26,9 @@ import { compressImage } from '../image-compress';
           </div>
         }
         <button type="button" class="photo-btn" [disabled]="photoBusy()" (click)="gallery.click()">
-          {{ photoBusy() ? 'Préparation de la photo…' : previewPicture() ? 'Changer la photo' : 'Ajouter une photo' }}
+          {{ photoBusy() ? 'Préparation de la photo…' : dragging() ? 'Lâche la photo ici' : previewPicture() ? 'Changer la photo' : 'Ajouter une photo' }}
         </button>
+        <p class="drop-hint">ou glisse une image ici</p>
         <button type="button" class="link camera-link" [disabled]="photoBusy()" (click)="camera.click()">Prendre une photo</button>
         <input #gallery type="file" accept="image/*" hidden (change)="pickPhoto($event)" />
         <input #camera type="file" accept="image/*" capture="environment" hidden (change)="pickPhoto($event)" />
@@ -152,6 +154,34 @@ export class AddItem implements OnInit {
     if (!file) return;
     event.preventDefault();
     void this.usePhoto(file);
+  }
+
+  dragging = signal(false);
+
+  private hasFiles(event: DragEvent) {
+    return Array.from(event.dataTransfer?.types ?? []).includes('Files');
+  }
+
+  onDragOver(event: DragEvent) {
+    if (!this.hasFiles(event)) return;
+    // Without this the browser would navigate to the dropped file.
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+    this.dragging.set(true);
+  }
+
+  onDragLeave(event: DragEvent) {
+    const form = event.currentTarget as HTMLElement;
+    if (!form.contains(event.relatedTarget as Node | null)) this.dragging.set(false);
+  }
+
+  onDrop(event: DragEvent) {
+    if (!this.hasFiles(event)) return;
+    event.preventDefault();
+    this.dragging.set(false);
+    const file = Array.from(event.dataTransfer?.files ?? []).find((f) => f.type.startsWith('image/'));
+    if (file) void this.usePhoto(file);
+    else this.photoError.set("Ce fichier n'est pas une image que je sais lire");
   }
 
   pickPhoto(event: Event) {
