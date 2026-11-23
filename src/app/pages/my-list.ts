@@ -6,7 +6,7 @@ import { Auth } from '../auth';
 import { Avatar } from '../components/avatar';
 import { AddItem } from '../components/add-item';
 import { ItemCard } from '../components/item-card';
-import { Item } from '../models';
+import { Item, itemLabel } from '../models';
 
 @Component({
   selector: 'app-my-list',
@@ -110,7 +110,7 @@ export class MyList implements OnInit {
   }
 
   async remove(item: Item) {
-    if (!confirm(`Retirer « ${item.title} » de ta liste ?`)) return;
+    if (!confirm(`Retirer « ${itemLabel(item)} » de ta liste ?`)) return;
     try {
       await this.api.removeItem(item.id);
       await this.load();

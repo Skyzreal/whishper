@@ -24404,6 +24404,8 @@ function loadConfig(env = process.env) {
 }
 
 // server/items.ts
+var COLUMNS = "id, owner, title, url, image, price, note, multi, favorite, picture_v, created_at";
+var NEEDS_SOMETHING = "Ajoute au moins un titre, un lien ou une photo";
 var HttpError = class extends Error {
   constructor(status, message) {
     super(message);
@@ -24412,12 +24414,15 @@ var HttpError = class extends Error {
   status;
 };
 function toOwnItem(row) {
+  const id = Number(row["id"]);
+  const pictureV = row["picture_v"] == null ? null : Number(row["picture_v"]);
   return {
-    id: Number(row["id"]),
+    id,
     owner: String(row["owner"]),
     title: String(row["title"]),
     url: row["url"] ?? null,
-    image: row["image"] ?? null,
+    image: pictureV !== null ? `/api/items/${id}/picture?v=${pictureV}` : row["image"] ?? null,
+    hasPicture: pictureV !== null,
     price: row["price"] ?? null,
     note: row["note"] ?? null,
     multi: Number(row["multi"]) === 1,
@@ -24428,13 +24433,13 @@ function toOwnItem(row) {
 async function getListForViewer(db, viewer, owner) {
   if (viewer === owner) {
     const res2 = await db.execute({
-      sql: "SELECT id, owner, title, url, image, price, note, multi, favorite, created_at FROM items WHERE owner = ? AND deleted_at IS NULL ORDER BY favorite DESC, id DESC",
+      sql: `SELECT ${COLUMNS} FROM items WHERE owner = ? AND deleted_at IS NULL ORDER BY favorite DESC, id DESC`,
       args: [owner]
     });
     return res2.rows.map((r) => toOwnItem(r));
   }
   const res = await db.execute({
-    sql: `SELECT i.id, i.owner, i.title, i.url, i.image, i.price, i.note, i.multi, i.favorite, i.created_at, c.claimer AS claimer
+    sql: `SELECT i.id, i.owner, i.title, i.url, i.image, i.price, i.note, i.multi, i.favorite, i.picture_v, i.created_at, c.claimer AS claimer
           FROM items i LEFT JOIN claims c ON c.item_id = i.id
           WHERE i.owner = ? AND i.deleted_at IS NULL ORDER BY i.favorite DESC, i.id DESC, c.created_at, c.claimer`,
     args: [owner]
@@ -24461,12 +24466,26 @@ async function countItemsByOwner(db) {
   return new Map(res.rows.map((r) => [String(r["owner"]), Number(r["n"])]));
 }
 async function addItem(db, owner, input) {
-  const res = await db.execute({
-    sql: `INSERT INTO items (owner, title, url, image, price, note, multi, favorite) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-          RETURNING id, owner, title, url, image, price, note, multi, favorite, created_at`,
-    args: [owner, input.title, input.url ?? null, input.image ?? null, input.price ?? null, input.note ?? null, input.multi ? 1 : 0, input.favorite ? 1 : 0]
-  });
-  return toOwnItem(res.rows[0]);
+  if (!input.title && !input.url && !input.picture) throw new HttpError(400, NEEDS_SOMETHING);
+  const tx = await db.transaction("write");
+  try {
+    const res = await tx.execute({
+      sql: `INSERT INTO items (owner, title, url, image, price, note, multi, favorite, picture_v) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            RETURNING ${COLUMNS}`,
+      args: [owner, input.title, input.url ?? null, input.image ?? null, input.price ?? null, input.note ?? null, input.multi ? 1 : 0, input.favorite ? 1 : 0, input.picture ? Date.now() : null]
+    });
+    const row = res.rows[0];
+    if (input.picture) {
+      await tx.execute({
+        sql: "INSERT INTO item_pictures (item_id, mime, data) VALUES (?, ?, ?)",
+        args: [Number(row["id"]), input.picture.mime, new Uint8Array(input.picture.data)]
+      });
+    }
+    await tx.commit();
+    return toOwnItem(row);
+  } finally {
+    tx.close();
+  }
 }
 async function updateOwnItem(db, owners, itemId2, patch) {
   const sets = [];
@@ -24482,14 +24501,51 @@ async function updateOwnItem(db, owners, itemId2, patch) {
   if (patch.note !== void 0) set("note", patch.note);
   if (patch.multi !== void 0) set("multi", patch.multi ? 1 : 0);
   if (patch.favorite !== void 0) set("favorite", patch.favorite ? 1 : 0);
+  if (patch.picture !== void 0) set("picture_v", patch.picture ? Date.now() : null);
   if (!sets.length) throw new HttpError(400, "Rien \xE0 modifier");
+  const tx = await db.transaction("write");
+  try {
+    const current = await tx.execute({
+      sql: `SELECT title, url, picture_v FROM items WHERE id = ? AND owner IN (${owners.map(() => "?").join(",")}) AND deleted_at IS NULL`,
+      args: [itemId2, ...owners]
+    });
+    if (!current.rows.length) {
+      await tx.rollback();
+      return null;
+    }
+    const cur = current.rows[0];
+    const title = patch.title !== void 0 ? patch.title : String(cur["title"]);
+    const url = patch.url !== void 0 ? patch.url : cur["url"] ?? null;
+    const hasPicture = patch.picture !== void 0 ? patch.picture !== null : cur["picture_v"] != null;
+    if (!title && !url && !hasPicture) throw new HttpError(400, NEEDS_SOMETHING);
+    const res = await tx.execute({
+      sql: `UPDATE items SET ${sets.join(", ")} WHERE id = ? RETURNING ${COLUMNS}`,
+      args: [...args, itemId2]
+    });
+    if (patch.picture) {
+      await tx.execute({
+        sql: "INSERT INTO item_pictures (item_id, mime, data) VALUES (?, ?, ?) ON CONFLICT (item_id) DO UPDATE SET mime = excluded.mime, data = excluded.data",
+        args: [itemId2, patch.picture.mime, new Uint8Array(patch.picture.data)]
+      });
+    } else if (patch.picture === null) {
+      await tx.execute({ sql: "DELETE FROM item_pictures WHERE item_id = ?", args: [itemId2] });
+    }
+    await tx.commit();
+    return toOwnItem(res.rows[0]);
+  } finally {
+    tx.close();
+  }
+}
+async function getPictureForViewer(db, viewer, itemId2) {
   const res = await db.execute({
-    sql: `UPDATE items SET ${sets.join(", ")}
-          WHERE id = ? AND owner IN (${owners.map(() => "?").join(",")}) AND deleted_at IS NULL
-          RETURNING id, owner, title, url, image, price, note, multi, favorite, created_at`,
-    args: [...args, itemId2, ...owners]
+    sql: `SELECT p.mime, p.data FROM item_pictures p JOIN items i ON i.id = p.item_id
+          WHERE p.item_id = ? AND (i.deleted_at IS NULL
+            OR EXISTS (SELECT 1 FROM claims c WHERE c.item_id = i.id AND c.claimer = ?))`,
+    args: [itemId2, viewer]
   });
-  return res.rows.length ? toOwnItem(res.rows[0]) : null;
+  if (!res.rows.length) return null;
+  const data = res.rows[0]["data"];
+  return { mime: String(res.rows[0]["mime"]), data: Buffer.from(data) };
 }
 async function deleteOwnItem(db, owners, itemId2) {
   const tx = await db.transaction("write");
@@ -24509,6 +24565,7 @@ async function deleteOwnItem(db, owners, itemId2) {
         args: [itemId2]
       });
     } else {
+      await tx.execute({ sql: "DELETE FROM item_pictures WHERE item_id = ?", args: [itemId2] });
       await tx.execute({ sql: "DELETE FROM items WHERE id = ?", args: [itemId2] });
     }
     await tx.commit();
@@ -24535,15 +24592,26 @@ async function claimItem(db, viewer, itemId2, managedByViewer = []) {
 }
 async function unclaimItem(db, viewer, itemId2) {
   await db.execute({ sql: "DELETE FROM claims WHERE item_id = ? AND claimer = ?", args: [itemId2, viewer] });
-  await db.execute({
-    sql: `DELETE FROM items WHERE id = ? AND deleted_at IS NOT NULL
-          AND NOT EXISTS (SELECT 1 FROM claims WHERE item_id = items.id)`,
-    args: [itemId2]
-  });
+  await db.batch(
+    [
+      {
+        sql: `DELETE FROM item_pictures WHERE item_id = ?
+              AND EXISTS (SELECT 1 FROM items WHERE id = item_pictures.item_id AND deleted_at IS NOT NULL)
+              AND NOT EXISTS (SELECT 1 FROM claims WHERE item_id = item_pictures.item_id)`,
+        args: [itemId2]
+      },
+      {
+        sql: `DELETE FROM items WHERE id = ? AND deleted_at IS NOT NULL
+              AND NOT EXISTS (SELECT 1 FROM claims WHERE item_id = items.id)`,
+        args: [itemId2]
+      }
+    ],
+    "write"
+  );
 }
 async function listReservations(db, viewer) {
   const res = await db.execute({
-    sql: `SELECT i.id, i.owner, i.title, i.url, i.image, i.price, i.note, i.multi, i.favorite, i.created_at, i.deleted_at
+    sql: `SELECT i.id, i.owner, i.title, i.url, i.image, i.price, i.note, i.multi, i.favorite, i.picture_v, i.created_at, i.deleted_at
           FROM claims c JOIN items i ON i.id = c.item_id
           WHERE c.claimer = ? ORDER BY i.owner, i.id DESC`,
     args: [viewer]
@@ -24552,6 +24620,29 @@ async function listReservations(db, viewer) {
     const row = r;
     return { ...toOwnItem(row), removed: row["deleted_at"] != null };
   });
+}
+
+// server/picture.ts
+var MAX_PICTURE_BYTES = 400 * 1024;
+var PICTURE_BODY_LIMIT = "700kb";
+var DATA_URL = /^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/]+={0,2})$/;
+function sniffImageType(b) {
+  if (b.length > 3 && b[0] === 255 && b[1] === 216 && b[2] === 255) return "image/jpeg";
+  if (b.length > 8 && b.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return "image/png";
+  if (b.length > 6 && (b.subarray(0, 6).toString("latin1") === "GIF87a" || b.subarray(0, 6).toString("latin1") === "GIF89a")) return "image/gif";
+  if (b.length > 12 && b.subarray(0, 4).toString("latin1") === "RIFF" && b.subarray(8, 12).toString("latin1") === "WEBP") return "image/webp";
+  return null;
+}
+function parsePicture(value) {
+  if (typeof value !== "string") throw new HttpError(400, "La photo est invalide");
+  if (value.length > Math.ceil(MAX_PICTURE_BYTES * 4 / 3) + 64) throw new HttpError(413, "La photo est trop lourde");
+  const m = DATA_URL.exec(value);
+  if (!m) throw new HttpError(400, "La photo doit \xEAtre une image JPEG, PNG, WebP ou GIF");
+  const data = Buffer.from(m[2], "base64");
+  if (data.length > MAX_PICTURE_BYTES) throw new HttpError(413, "La photo est trop lourde");
+  const mime = sniffImageType(data);
+  if (!mime || mime !== m[1]) throw new HttpError(400, "La photo doit \xEAtre une image JPEG, PNG, WebP ou GIF");
+  return { mime, data };
 }
 
 // server/password.ts
@@ -24957,7 +25048,11 @@ function createApp({ config, getDb, fetchPreview: fetchPreview2 = fetchPreview }
     res.setHeader("Cache-Control", "no-store");
     next();
   });
-  api.use(import_express.default.json({ limit: "20kb" }));
+  api.use((req, res, next) => {
+    if (["POST", "PATCH"].includes(req.method) && /^\/items(\/\d+)?\/?$/.test(req.path)) return next();
+    import_express.default.json({ limit: "20kb" })(req, res, next);
+  });
+  const itemJson = import_express.default.json({ limit: PICTURE_BODY_LIMIT });
   api.use((req, _res, next) => {
     const origin = req.headers.origin;
     if (!["GET", "HEAD", "OPTIONS"].includes(req.method) && origin) {
@@ -25095,7 +25190,7 @@ function createApp({ config, getDb, fetchPreview: fetchPreview2 = fetchPreview }
     const me = req.user;
     res.json({ items: await getListForViewer(await getDb(), me, me) });
   });
-  api.post("/items", requireUser, async (req, res) => {
+  api.post("/items", requireUser, itemJson, async (req, res) => {
     const me = req.user;
     const body = req.body ?? {};
     let owner = me;
@@ -25104,17 +25199,18 @@ function createApp({ config, getDb, fetchPreview: fetchPreview2 = fetchPreview }
       if (!owner) throw new HttpError(403, "Tu ne g\xE8res pas la liste de cette personne");
     }
     const item = await addItem(await getDb(), owner, {
-      title: text(body.title, 200, "Le titre", true),
+      title: text(body.title, 200, "Le titre") ?? "",
       url: webUrl(body.url, "Le lien"),
       image: webUrl(body.image, "L'image"),
       price: text(body.price, 50, "Le prix"),
       note: text(body.note, 1e3, "La note"),
       multi: body.multi === true,
-      favorite: body.favorite === true
+      favorite: body.favorite === true,
+      picture: body.picture == null ? null : parsePicture(body.picture)
     });
     res.status(201).json({ item });
   });
-  api.patch("/items/:id", requireUser, async (req, res) => {
+  api.patch("/items/:id", requireUser, itemJson, async (req, res) => {
     const user = req.user;
     const body = req.body ?? {};
     const has = (k) => body[k] !== void 0;
@@ -25123,16 +25219,26 @@ function createApp({ config, getDb, fetchPreview: fetchPreview2 = fetchPreview }
       return body[k];
     };
     const patch = {};
-    if (has("title")) patch.title = text(body.title, 200, "Le titre", true);
+    if (has("title")) patch.title = text(body.title, 200, "Le titre") ?? "";
     if (has("url")) patch.url = webUrl(body.url, "Le lien");
     if (has("image")) patch.image = webUrl(body.image, "L'image");
     if (has("price")) patch.price = text(body.price, 50, "Le prix");
     if (has("note")) patch.note = text(body.note, 1e3, "La note");
     if (has("multi")) patch.multi = flag("multi");
     if (has("favorite")) patch.favorite = flag("favorite");
+    if (has("picture")) patch.picture = body.picture === null ? null : parsePicture(body.picture);
     const item = await updateOwnItem(await getDb(), [user, ...managedBy(user)], itemId(req), patch);
     if (!item) throw new HttpError(404, "Cadeau introuvable");
     res.json({ item });
+  });
+  api.get("/items/:id/picture", requireUser, async (req, res) => {
+    const picture = await getPictureForViewer(await getDb(), req.user, itemId(req));
+    if (!picture) throw new HttpError(404, "Photo introuvable");
+    res.setHeader("Content-Type", picture.mime);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Security-Policy", "default-src 'none'");
+    res.setHeader("Cache-Control", "private, max-age=31536000, immutable");
+    res.send(picture.data);
   });
   api.delete("/items/:id", requireUser, async (req, res) => {
     const user = req.user;
@@ -25163,6 +25269,8 @@ function createApp({ config, getDb, fetchPreview: fetchPreview2 = fetchPreview }
       res.status(err.status).json({ error: err.message });
     } else if (err?.type === "entity.parse.failed") {
       res.status(400).json({ error: "JSON invalide" });
+    } else if (err?.type === "entity.too.large") {
+      res.status(413).json({ error: "La requ\xEAte est trop volumineuse" });
     } else {
       console.error(err);
       res.status(500).json({ error: "Une erreur est survenue" });
@@ -25188,9 +25296,17 @@ var SCHEMA = [
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     deleted_at TEXT,
     multi      INTEGER NOT NULL DEFAULT 0,
-    favorite   INTEGER NOT NULL DEFAULT 0
+    favorite   INTEGER NOT NULL DEFAULT 0,
+    picture_v  INTEGER
   )`,
   `CREATE INDEX IF NOT EXISTS items_owner_idx ON items (owner)`,
+  // Uploaded photos live apart from items so list queries never load the image bytes.
+  // items.picture_v is set while a photo exists and doubles as the cache-busting version.
+  `CREATE TABLE IF NOT EXISTS item_pictures (
+    item_id INTEGER PRIMARY KEY REFERENCES items (id) ON DELETE CASCADE,
+    mime    TEXT NOT NULL,
+    data    BLOB NOT NULL
+  )`,
   // One personal password per family member, chosen by them on first sign-in.
   `CREATE TABLE IF NOT EXISTS credentials (
     name       TEXT PRIMARY KEY,
@@ -25222,6 +25338,9 @@ async function openDb(url, authToken) {
   }
   if (!cols.rows.some((r) => r["name"] === "favorite")) {
     await db.execute("ALTER TABLE items ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0");
+  }
+  if (!cols.rows.some((r) => r["name"] === "picture_v")) {
+    await db.execute("ALTER TABLE items ADD COLUMN picture_v INTEGER");
   }
   const claimCols = await db.execute("PRAGMA table_info(claims)");
   if (!claimCols.rows.some((r) => r["name"] === "claimer" && Number(r["pk"]) > 0)) {

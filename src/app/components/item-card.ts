@@ -1,13 +1,17 @@
 import { Component, computed, input, output } from '@angular/core';
-import { Item } from '../models';
+import { Item, itemLabel } from '../models';
 
 @Component({
   selector: 'app-item-card',
   template: `
     @let i = item();
-    <article class="card" [class.fav]="i.favorite" [class.taken]="mode() === 'other' && i.claimed && !i.claimedByMe" [class.mine]="mode() === 'other' && i.claimedByMe" [class.removed]="i.removed">
+    <article class="card" [class.fav]="i.favorite" [class.pic-only]="!i.title.trim()" [class.taken]="mode() === 'other' && i.claimed && !i.claimedByMe" [class.mine]="mode() === 'other' && i.claimedByMe" [class.removed]="i.removed">
       <div class="thumb">
-        @if (i.image) {
+        @if (i.image && i.hasPicture) {
+          <a class="thumb-link" [href]="i.image" target="_blank" rel="noopener" aria-label="Voir la photo en grand">
+            <img [src]="i.image" alt="" loading="lazy" />
+          </a>
+        } @else if (i.image) {
           <img [src]="i.image" alt="" loading="lazy" referrerpolicy="no-referrer" />
         } @else {
           <span class="placeholder" aria-hidden="true">{{ initial() }}</span>
@@ -18,7 +22,7 @@ import { Item } from '../models';
           @if (i.favorite) {
             <svg class="fav-mark" viewBox="0 0 24 24" role="img" aria-label="Coup de cœur"><path d="M12 2.8l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.6l-5.9 3.2 1.2-6.5L2.5 9.7l6.6-.9z"/></svg>
           }
-          {{ i.title }}
+          {{ label() }}
         </h3>
         @if (i.price) {
           <p class="price">{{ i.price }}</p>
@@ -75,7 +79,8 @@ export class ItemCard {
   edit = output<Item>();
   toggleFavorite = output<Item>();
 
-  protected initial = computed(() => Array.from(this.item().title.trim())[0]?.toLocaleUpperCase('fr') ?? '');
+  protected label = computed(() => itemLabel(this.item()));
+  protected initial = computed(() => Array.from(this.label())[0]?.toLocaleUpperCase('fr') ?? '');
 
   protected host = computed(() => {
     try {

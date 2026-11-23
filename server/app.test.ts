@@ -81,7 +81,7 @@ describe('privacy: the owner never receives claim data', () => {
       expect(raw).not.toContain('claim');
       expect(raw).not.toContain('michaël');
       expect(Object.keys(res.body.items[0]).sort()).toEqual(
-        ['createdAt', 'favorite', 'id', 'image', 'multi', 'note', 'owner', 'price', 'title', 'url'].sort(),
+        ['createdAt', 'favorite', 'hasPicture', 'id', 'image', 'multi', 'note', 'owner', 'price', 'title', 'url'].sort(),
       );
     }
   });
@@ -515,6 +515,128 @@ describe('editing an item and marking favorites', () => {
     await bob.post(`/api/items/${id}/claim`);
     await alice.delete(`/api/items/${id}`);
     expect((await alice.patch(`/api/items/${id}`).send({ title: 'Back' })).status).toBe(404);
+  });
+});
+
+describe('pictures', () => {
+  const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64, 1)]);
+  const JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(64, 2)]);
+  const dataUrl = (mime: string, bytes: Buffer) => `data:${mime};base64,${bytes.toString('base64')}`;
+
+  it('accepts a picture-only item and serves the picture to everyone, with safe headers', async () => {
+    const alice = as(await login('Stéphanie'));
+    const bob = as(await login('Michaël'));
+    const res = await alice.post('/api/items').send({ picture: dataUrl('image/png', PNG) });
+    expect(res.status).toBe(201);
+    const { id, image, hasPicture, title } = res.body.item;
+    expect(title).toBe('');
+    expect(hasPicture).toBe(true);
+    expect(image).toMatch(new RegExp(`^/api/items/${id}/picture\\?v=\\d+$`));
+
+    for (const viewer of [alice, bob]) {
+      const pic = await viewer.get(`/api/items/${id}/picture`).buffer(true).parse((r, cb) => {
+        const chunks: Buffer[] = [];
+        r.on('data', (c: Buffer) => chunks.push(c));
+        r.on('end', () => cb(null, Buffer.concat(chunks)));
+      });
+      expect(pic.status).toBe(200);
+      expect(pic.headers['content-type']).toBe('image/png');
+      expect(pic.headers['x-content-type-options']).toBe('nosniff');
+      expect(pic.headers['cache-control']).toContain('immutable');
+      expect((pic.body as Buffer).equals(PNG)).toBe(true);
+    }
+  });
+
+  it('requires a title, a link or a picture', async () => {
+    const alice = as(await login('Stéphanie'));
+    expect((await alice.post('/api/items').send({})).status).toBe(400);
+    expect((await alice.post('/api/items').send({ title: '  ', note: 'x' })).status).toBe(400);
+    expect((await alice.post('/api/items').send({ url: 'https://example.com/a' })).status).toBe(201);
+    expect((await alice.post('/api/items').send({ title: 'Gift card' })).status).toBe(201);
+    const id = (await alice.post('/api/items').send({ picture: dataUrl('image/png', PNG) })).body.item.id;
+    // Removing the only content is refused, but removing the picture of an item that still has a title is fine.
+    expect((await alice.patch(`/api/items/${id}`).send({ picture: null })).status).toBe(400);
+    expect((await alice.patch(`/api/items/${id}`).send({ title: 'Now titled', picture: null })).status).toBe(200);
+  });
+
+  it('rejects pictures that are too big, of the wrong type or not what they claim to be', async () => {
+    const alice = as(await login('Stéphanie'));
+    const post = (picture: unknown) => alice.post('/api/items').send({ title: 'x', picture });
+    expect((await post(dataUrl('image/png', Buffer.concat([PNG, Buffer.alloc(401 * 1024)])))).status).toBe(413);
+    expect((await post(`data:image/svg+xml;base64,${Buffer.from('<svg onload="alert(1)"/>').toString('base64')}`)).status).toBe(400);
+    expect((await post(dataUrl('image/png', Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>')))).status).toBe(400);
+    expect((await post(dataUrl('image/png', JPEG))).status).toBe(400);
+    expect((await post('https://example.com/a.png')).status).toBe(400);
+    expect((await post(42)).status).toBe(400);
+    // A body far beyond the limit is cut off before it is parsed.
+    expect((await post(dataUrl('image/png', Buffer.alloc(2 * 1024 * 1024, 1)))).status).toBe(413);
+    expect((await alice.get('/api/items')).body.items).toHaveLength(0);
+  });
+
+  it('keeps the small body limit for everything that is not an item write', async () => {
+    const res = await request(app).post('/api/login').send({ name: 'x'.repeat(30 * 1024), password: 'y' });
+    expect(res.status).toBe(413);
+  });
+
+  it('only serves pictures to signed-in members', async () => {
+    const alice = as(await login('Stéphanie'));
+    const id = (await alice.post('/api/items').send({ picture: dataUrl('image/png', PNG) })).body.item.id;
+    expect((await request(app).get(`/api/items/${id}/picture`)).status).toBe(401);
+    expect((await request(app).post('/api/items').send({ picture: dataUrl('image/png', PNG) })).status).toBe(401);
+    expect((await alice.get('/api/items/9999/picture')).status).toBe(404);
+    expect((await alice.get('/api/items/abc/picture')).status).toBe(400);
+  });
+
+  it('lets the owner replace and remove the picture; a scraped image comes back when it is removed', async () => {
+    const alice = as(await login('Stéphanie'));
+    const id = (
+      await alice.post('/api/items').send({ title: 'Lamp', image: 'https://example.com/lamp.jpg', picture: dataUrl('image/png', PNG) })
+    ).body.item.id as number;
+    const first = (await alice.get('/api/items')).body.items[0];
+    expect(first.image).toContain('/picture?v=');
+
+    await new Promise((r) => setTimeout(r, 5));
+    const replaced = (await alice.patch(`/api/items/${id}`).send({ picture: dataUrl('image/jpeg', JPEG) })).body.item;
+    expect(replaced.image).not.toBe(first.image);
+    expect((await alice.get(`/api/items/${id}/picture`)).headers['content-type']).toBe('image/jpeg');
+
+    const removed = (await alice.patch(`/api/items/${id}`).send({ picture: null })).body.item;
+    expect(removed).toMatchObject({ hasPicture: false, image: 'https://example.com/lamp.jpg' });
+    expect((await alice.get(`/api/items/${id}/picture`)).status).toBe(404);
+  });
+
+  it('does not leak claims: the owner gets no claim data, and an owner-removed claimed item keeps its picture for the claimer only', async () => {
+    const alice = as(await login('Stéphanie'));
+    const bob = as(await login('Michaël'));
+    const carol = as(await login('Nathaniel'));
+    const id = (await alice.post('/api/items').send({ picture: dataUrl('image/png', PNG) })).body.item.id as number;
+    await bob.post(`/api/items/${id}/claim`);
+
+    const owner = await alice.get('/api/items');
+    expect(JSON.stringify(owner.body).toLowerCase()).not.toContain('claim');
+    expect(JSON.stringify(owner.body).toLowerCase()).not.toContain('michaël');
+    const pic = await alice.get(`/api/items/${id}/picture`);
+    expect(Object.keys(pic.headers).join(' ').toLowerCase()).not.toContain('claim');
+
+    await alice.delete(`/api/items/${id}`);
+    expect((await bob.get(`/api/items/${id}/picture`)).status).toBe(200);
+    expect((await alice.get(`/api/items/${id}/picture`)).status).toBe(404);
+    expect((await carol.get(`/api/items/${id}/picture`)).status).toBe(404);
+    expect((await carol.get('/api/items/424242/picture')).status).toBe(404);
+    const reserved = (await bob.get('/api/reservations')).body.items[0];
+    expect(reserved).toMatchObject({ removed: true, hasPicture: true });
+
+    // Once the claimer lets go, the picture is gone for good.
+    await bob.delete(`/api/items/${id}/claim`);
+    expect((await bob.get(`/api/items/${id}/picture`)).status).toBe(404);
+    expect((await db.execute('SELECT 1 FROM item_pictures')).rows).toHaveLength(0);
+  });
+
+  it('deletes the picture together with an unclaimed item', async () => {
+    const alice = as(await login('Stéphanie'));
+    const id = (await alice.post('/api/items').send({ picture: dataUrl('image/png', PNG) })).body.item.id as number;
+    await alice.delete(`/api/items/${id}`);
+    expect((await db.execute('SELECT 1 FROM item_pictures')).rows).toHaveLength(0);
   });
 });
 

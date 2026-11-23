@@ -7,7 +7,7 @@ L'application est entièrement en français. Les prénoms de la famille se confi
 
 - Chaque personne a sa propre liste, clairement identifiée. Tu peux consulter la liste de chacun depuis la page **Famille**.
 - Ajoute des cadeaux d'où tu veux : colle un lien de produit (le titre, l'image et le prix sont récupérés automatiquement
-  quand la boutique le permet) ou écris simplement ce que tu veux, par exemple *« Carte-cadeau – n'importe quel magasin, environ 50 $ »*.
+  quand la boutique le permet), ajoute **ta propre photo** (même sans rien d'autre), ou écris simplement ce que tu veux, par exemple *« Carte-cadeau – n'importe quel magasin, environ 50 $ »*.
 - **Réserve des cadeaux à la Amazon.** Clique sur **« Je m'en occupe »** sur le cadeau de quelqu'un d'autre. Tout le monde
   le voit alors grisé avec la mention *Déjà réservé*, donc personne n'achète en double, et tu peux **Annuler** en tout temps.
 - **La personne concernée ne le saura jamais.** Elle ne voit jamais quels cadeaux sont réservés, ni par qui, pour que la surprise reste entière.
@@ -138,11 +138,19 @@ Monte un volume persistant pour `data/` ou pointe `TURSO_DATABASE_URL` vers Turs
 ## Utilisation
 
 1. **Connecte-toi** avec ton prénom. La première fois, entre le code secret de la famille et crée ton mot de passe ; ensuite, ton mot de passe suffit.
-2. **Ma liste :** ajoute des cadeaux (colle un lien, modifie au besoin le titre ou le prix récupérés, ou décris quelque chose comme une carte-cadeau). Retire-les en tout temps.
+2. **Ma liste :** ajoute des cadeaux (colle un lien, ajoute une photo, modifie au besoin le titre ou le prix récupérés, ou décris quelque chose comme une carte-cadeau). Retire-les en tout temps.
 3. **Famille :** ouvre la liste de quelqu'un et clique sur **Je m'en occupe** pour ce que tu comptes acheter. Tu changes d'idée ? Clique sur **Annuler**.
 4. **Mes réservations :** retrouve tout ce que tu as réservé, classé par personne. Seul(e) toi y as accès.
 
 L'interface est pensée pour le téléphone : sur un petit écran, une barre d'onglets en bas (Famille, Réservés, **Ajouter**, Ma liste) remplace le menu du haut.
+
+### Photos
+
+Sur **Ma liste**, **« Ajouter une photo »** ouvre la galerie ou l'appareil photo du téléphone (sur un ordinateur : le sélecteur de fichiers, ou colle directement une image avec Ctrl+V). Une idée peut n'avoir **qu'une photo** : le titre est alors facultatif et la carte s'appelle *« Idée cadeau »*. Il faut seulement au moins un titre, un lien ou une photo. Tu peux retirer ou remplacer la photo avec **Modifier**; une photo ajoutée a priorité sur l'image d'un aperçu de lien (qui revient si tu la retires).
+
+- **Stockage :** pas de disque (Vercel n'en a pas), tout est dans la base de données, dans une table `item_pictures` séparée pour que les listes restent légères. Aucun service payant.
+- **Limites :** le navigateur réduit la photo (1000 px max, JPEG, environ 300 Ko ou moins) avant l'envoi ; le serveur refuse tout ce qui dépasse 400 Ko, qui n'est pas du JPEG, PNG, WebP ou GIF (pas de SVG) ou dont le contenu réel ne correspond pas au type annoncé (vérification des premiers octets). Les écritures d'idées acceptent un corps de 700 Ko au plus (20 Ko ailleurs).
+- **Confidentialité :** `GET /api/items/:id/picture` demande d'être connecté, répond avec `X-Content-Type-Options: nosniff` et un cache privé (l'adresse change avec la photo). Une idée retirée par son propriétaire mais réservée garde sa photo visible pour ceux qui l'ont réservée, rien d'autre : pour tous les autres, la réponse est un 404 identique à une photo inexistante. Rien sur les réservations ne passe par cette route.
 
 ### Aperçu des liens
 

@@ -14,9 +14,17 @@ const SCHEMA = [
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     deleted_at TEXT,
     multi      INTEGER NOT NULL DEFAULT 0,
-    favorite   INTEGER NOT NULL DEFAULT 0
+    favorite   INTEGER NOT NULL DEFAULT 0,
+    picture_v  INTEGER
   )`,
   `CREATE INDEX IF NOT EXISTS items_owner_idx ON items (owner)`,
+  // Uploaded photos live apart from items so list queries never load the image bytes.
+  // items.picture_v is set while a photo exists and doubles as the cache-busting version.
+  `CREATE TABLE IF NOT EXISTS item_pictures (
+    item_id INTEGER PRIMARY KEY REFERENCES items (id) ON DELETE CASCADE,
+    mime    TEXT NOT NULL,
+    data    BLOB NOT NULL
+  )`,
   // One personal password per family member, chosen by them on first sign-in.
   `CREATE TABLE IF NOT EXISTS credentials (
     name       TEXT PRIMARY KEY,
@@ -50,6 +58,9 @@ export async function openDb(url: string, authToken?: string): Promise<Client> {
   }
   if (!cols.rows.some((r) => r['name'] === 'favorite')) {
     await db.execute('ALTER TABLE items ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!cols.rows.some((r) => r['name'] === 'picture_v')) {
+    await db.execute('ALTER TABLE items ADD COLUMN picture_v INTEGER');
   }
   // Older databases keyed claims by item_id alone, which only allows one claimer per item.
   const claimCols = await db.execute('PRAGMA table_info(claims)');

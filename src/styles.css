@@ -124,6 +124,21 @@ button.link.forgot { display: block; margin: 0.75rem auto 0; color: var(--red); 
 .preview { display: flex; align-items: center; gap: 0.75rem; }
 .preview img { width: 64px; height: 64px; object-fit: cover; border-radius: 3px; border: 1px solid var(--line); }
 
+/* Photo upload: a big, friendly button first, the camera shortcut only where it means something (phones). */
+.photo { display: flex; flex-direction: column; gap: 0.6rem; align-items: stretch; }
+button.photo-btn {
+  width: 100%; padding: 0.95rem 1rem; font-size: 1.05rem;
+  background: var(--paper); color: var(--btn); border: 2px dashed var(--btn); border-radius: 10px;
+}
+button.photo-btn:hover:not(:disabled) { background: #e8f1ea; color: var(--btn-dark); border-color: var(--btn-dark); }
+button.camera-link { display: none; align-self: center; }
+@media (pointer: coarse) { button.camera-link { display: inline-block; } }
+.photo-preview { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; }
+.photo-preview img {
+  max-width: 100%; max-height: 240px; object-fit: contain; border-radius: 8px;
+  border: 1px solid var(--line-strong); background: #efe8dd;
+}
+
 .list { border-top: 1px solid var(--line-strong); }
 .card {
   display: grid;
@@ -155,6 +170,10 @@ button.tool:hover:not(:disabled) { background: none; color: var(--btn-dark); }
 .group-head a:hover { text-decoration: underline; }
 .thumb { width: 72px; height: 72px; border-radius: 3px; background: #efe8dd; display: grid; place-items: center; overflow: hidden; }
 .thumb img { width: 100%; height: 100%; object-fit: cover; }
+.thumb-link { display: block; width: 100%; height: 100%; }
+.card.pic-only h3 { color: var(--muted); font-weight: 400; font-style: italic; }
+.card.pic-only:has(.thumb-link) { grid-template-columns: 104px 1fr auto; }
+.card.pic-only:has(.thumb-link) .thumb { width: 104px; height: 104px; }
 .placeholder { font-family: var(--serif); font-size: 1.9rem; color: var(--line-strong); }
 .body { min-width: 0; }
 .body p { margin: 0.1rem 0; }
@@ -173,6 +192,8 @@ label.check input { width: auto; margin: 0; }
 @media (max-width: 560px) {
   .card { grid-template-columns: 60px 1fr; gap: 0.85rem; }
   .thumb { width: 60px; height: 60px; }
+  .card.pic-only:has(.thumb-link) { grid-template-columns: 84px 1fr; }
+  .card.pic-only:has(.thumb-link) .thumb { width: 84px; height: 84px; }
   .actions { grid-column: 1 / -1; flex-direction: row; justify-content: flex-end; align-items: center; }
 }
 

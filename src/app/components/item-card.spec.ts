@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ItemCard } from './item-card';
-import { Item } from '../models';
+import { Item, itemLabel } from '../models';
 
 const base: Item = {
   id: 1,
@@ -81,4 +81,19 @@ describe('ItemCard', () => {
     const el = render({ ...base, multi: true }, 'own');
     expect(el.textContent).toContain("Plusieurs personnes peuvent l'offrir");
     expect(el.textContent).not.toMatch(/prévu par/);
-  });});
+  });
+
+  it('shows a picture-only item with a neutral label and a link to the full picture', () => {
+    const el = render({ ...base, title: '', url: null, image: '/api/items/1/picture?v=5', hasPicture: true }, 'other');
+    expect(el.querySelector('h3')?.textContent?.trim()).toBe('Idée cadeau');
+    expect(el.querySelector('.card.pic-only')).not.toBeNull();
+    expect(el.querySelector('a.thumb-link')?.getAttribute('href')).toBe('/api/items/1/picture?v=5');
+    expect(el.querySelector('a.thumb-link')?.getAttribute('rel')).toContain('noopener');
+  });
+
+  it('labels a link-only item with its site', () => {
+    expect(itemLabel({ title: '', url: 'https://www.shop.example/x' })).toBe('shop.example');
+    expect(itemLabel({ title: ' Socks ', url: null })).toBe('Socks');
+    expect(itemLabel({ title: '', url: null })).toBe('Idée cadeau');
+  });
+});

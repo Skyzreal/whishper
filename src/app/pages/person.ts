@@ -4,7 +4,7 @@ import { Api, errorMessage } from '../api';
 import { Avatar } from '../components/avatar';
 import { AddItem } from '../components/add-item';
 import { ItemCard } from '../components/item-card';
-import { Item } from '../models';
+import { Item, itemLabel } from '../models';
 
 @Component({
   selector: 'app-person',
@@ -100,7 +100,7 @@ export class PersonPage {
   }
 
   async remove(item: Item) {
-    if (!confirm(`Retirer « ${item.title} » de la liste de ${this.owner()} ?`)) return;
+    if (!confirm(`Retirer « ${itemLabel(item)} » de la liste de ${this.owner()} ?`)) return;
     await this.act(() => this.api.removeItem(item.id));
   }
 

@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { inject } from '@angular/core';
 import { Api, errorMessage } from '../api';
 import { Item } from '../models';
+import { compressImage } from '../image-compress';
 
 @Component({
   selector: 'app-add-item',
@@ -11,10 +12,27 @@ import { Item } from '../models';
     @if (!open() && !item()) {
       <button type="button" class="add-toggle" (click)="open.set(true)">{{ forName() ? 'Ajouter à la liste ' + deNom() : 'Ajouter à ma liste' }}</button>
     } @else {
-    <form class="panel add" (ngSubmit)="submit()" #f="ngForm">
+    <form class="panel add" (ngSubmit)="submit()" (paste)="onFormPaste($event)" #f="ngForm">
       <div class="panel-head">
         <h2>{{ item() ? "Modifier l'idée" : 'Une nouvelle idée' }}</h2>
         <button type="button" class="link" (click)="close()">{{ item() ? 'Annuler' : 'Fermer' }}</button>
+      </div>
+      <div class="photo">
+        @if (previewPicture()) {
+          <div class="photo-preview">
+            <img [src]="previewPicture()" alt="Aperçu de ta photo" />
+            <button type="button" class="link" (click)="removePhoto()">Retirer la photo</button>
+          </div>
+        }
+        <button type="button" class="photo-btn" [disabled]="photoBusy()" (click)="gallery.click()">
+          {{ photoBusy() ? 'Préparation de la photo…' : previewPicture() ? 'Changer la photo' : 'Ajouter une photo' }}
+        </button>
+        <button type="button" class="link camera-link" [disabled]="photoBusy()" (click)="camera.click()">Prendre une photo</button>
+        <input #gallery type="file" accept="image/*" hidden (change)="pickPhoto($event)" />
+        <input #camera type="file" accept="image/*" capture="environment" hidden (change)="pickPhoto($event)" />
+        @if (photoError()) {
+          <p class="error" role="alert">{{ photoError() }}</p>
+        }
       </div>
       <label>
         Lien <span class="hint">(si t'en as un)</span>
@@ -28,15 +46,15 @@ import { Item } from '../models';
       @if (hint()) {
         <p class="hint-note" role="status">{{ hint() }}</p>
       }
-      @if (image()) {
+      @if (image() && !previewPicture()) {
         <div class="preview">
           <img [src]="image()" alt="" referrerpolicy="no-referrer" />
           <button type="button" class="link" (click)="image.set('')">Retirer l'image</button>
         </div>
       }
       <label>
-        C'est quoi ?
-        <input name="title" required maxlength="200" placeholder="Une couverture, une carte-cadeau…" [(ngModel)]="title" />
+        C'est quoi ? <span class="hint">(facultatif si tu mets une photo ou un lien)</span>
+        <input name="title" maxlength="200" placeholder="Une couverture, une carte-cadeau…" [(ngModel)]="title" />
       </label>
       <div class="row two">
         <label>
@@ -59,7 +77,7 @@ import { Item } from '../models';
       @if (error()) {
         <p class="error" role="alert">{{ error() }}</p>
       }
-      <button type="submit" [disabled]="!title().trim() || saving()">{{ submitLabel() }}</button>
+      <button type="submit" [disabled]="!canSubmit() || saving() || photoBusy()">{{ submitLabel() }}</button>
     </form>
     }
   `,
@@ -83,6 +101,16 @@ export class AddItem implements OnInit {
   multi = signal(false);
   favorite = signal(false);
   image = signal('');
+  /** A freshly chosen picture (already compressed), as a data URL. */
+  photo = signal<string | null>(null);
+  /** The picture an item being edited already has. */
+  private existingPicture = signal<string | null>(null);
+  private pictureRemoved = signal(false);
+  photoBusy = signal(false);
+  photoError = signal('');
+  previewPicture = computed(() => this.photo() ?? (this.pictureRemoved() ? null : this.existingPicture()));
+  protected canSubmit = computed(() => !!(this.title().trim() || this.url().trim() || this.previewPicture()));
+  private initialImage = '';
   fetching = signal(false);
   saving = signal(false);
   error = signal('');
@@ -91,7 +119,7 @@ export class AddItem implements OnInit {
 
   protected submitLabel = computed(() => {
     if (this.item()) return this.saving() ? 'Enregistrement…' : 'Enregistrer';
-    return this.saving() ? 'Ajout…' : 'Ajouter';
+    return this.saving() ? (this.photo() ? 'Envoi de la photo…' : 'Ajout…') : 'Ajouter';
   });
 
   ngOnInit() {
@@ -99,7 +127,10 @@ export class AddItem implements OnInit {
     if (!it) return;
     this.title.set(it.title);
     this.url.set(it.url ?? '');
-    this.image.set(it.image ?? '');
+    // An uploaded picture is shown through `existingPicture`; `image` only ever holds a link preview.
+    if (it.hasPicture) this.existingPicture.set(it.image);
+    else this.image.set(it.image ?? '');
+    this.initialImage = this.image();
     this.price.set(it.price ?? '');
     this.note.set(it.note ?? '');
     this.multi.set(!!it.multi);
@@ -114,6 +145,38 @@ export class AddItem implements OnInit {
 
   onPaste() {
     setTimeout(() => this.fetchDetails());
+  }
+
+  onFormPaste(event: ClipboardEvent) {
+    const file = Array.from(event.clipboardData?.files ?? []).find((f) => f.type.startsWith('image/'));
+    if (!file) return;
+    event.preventDefault();
+    void this.usePhoto(file);
+  }
+
+  pickPhoto(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (file) void this.usePhoto(file);
+  }
+
+  private async usePhoto(file: File) {
+    this.photoBusy.set(true);
+    this.photoError.set('');
+    try {
+      this.photo.set(await compressImage(file));
+    } catch (e) {
+      this.photoError.set(e instanceof Error ? e.message : "Impossible de lire cette photo");
+    } finally {
+      this.photoBusy.set(false);
+    }
+  }
+
+  removePhoto() {
+    this.photo.set(null);
+    this.photoError.set('');
+    if (this.existingPicture()) this.pictureRemoved.set(true);
   }
 
   async fetchDetails(force = false) {
@@ -141,16 +204,19 @@ export class AddItem implements OnInit {
   }
 
   async submit() {
-    if (!this.title().trim()) return;
+    if (!this.canSubmit()) return;
     this.saving.set(true);
     this.error.set('');
     try {
       const existing = this.item();
       if (existing) {
+        const picture = this.photo() ?? (this.pictureRemoved() ? null : undefined);
         await this.api.updateItem(existing.id, {
           title: this.title().trim(),
           url: this.url().trim(),
-          image: this.image(),
+          // Left out when untouched: an item with an uploaded picture has no editable link preview here.
+          ...(this.image() !== this.initialImage ? { image: this.image() } : {}),
+          ...(picture !== undefined ? { picture } : {}),
           price: this.price().trim(),
           note: this.note().trim(),
           multi: this.multi(),
@@ -160,9 +226,10 @@ export class AddItem implements OnInit {
         return;
       }
       await this.api.addItem({
-        title: this.title().trim(),
+        title: this.title().trim() || undefined,
         url: this.url().trim() || undefined,
         image: this.image() || undefined,
+        picture: this.photo() ?? undefined,
         price: this.price().trim() || undefined,
         note: this.note().trim() || undefined,
         forName: this.forName() || undefined,
@@ -172,6 +239,8 @@ export class AddItem implements OnInit {
       this.multi.set(false);
       this.favorite.set(false);
       for (const s of [this.url, this.title, this.price, this.note, this.image, this.hint]) s.set('');
+      this.photo.set(null);
+      this.photoError.set('');
       this.fetchedFor = '';
       this.open.set(false);
       this.added.emit();

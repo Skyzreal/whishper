@@ -4,6 +4,8 @@ export interface Item {
   title: string;
   url: string | null;
   image: string | null;
+  /** True when `image` is a picture someone uploaded rather than a link preview. */
+  hasPicture?: boolean;
   price: string | null;
   note: string | null;
   createdAt: string;
@@ -37,9 +39,12 @@ export interface Preview {
 }
 
 export interface NewItem {
-  title: string;
+  /** Optional when there is a link or a picture. */
+  title?: string;
   url?: string;
   image?: string;
+  /** A JPEG/PNG/WebP/GIF data URL, already shrunk by the browser. */
+  picture?: string;
   price?: string;
   note?: string;
   multi?: boolean;
@@ -53,10 +58,25 @@ export interface ItemPatch {
   title?: string;
   url?: string;
   image?: string;
+  /** A new picture as a data URL, or null to remove the uploaded one. */
+  picture?: string | null;
   price?: string;
   note?: string;
   multi?: boolean;
   favorite?: boolean;
+}
+
+export const PICTURE_ONLY_LABEL = 'Idée cadeau';
+
+/** What to call an item: its title, else the site of its link, else a neutral label (picture-only items). */
+export function itemLabel(item: Pick<Item, 'title' | 'url'>): string {
+  const title = item.title.trim();
+  if (title) return title;
+  try {
+    return new URL(item.url ?? '').hostname.replace(/^www\./, '') || PICTURE_ONLY_LABEL;
+  } catch {
+    return PICTURE_ONLY_LABEL;
+  }
 }
 
 export interface PersonList {

@@ -8,11 +8,13 @@ import {
   countItemsByOwner,
   deleteOwnItem,
   getListForViewer,
+  getPictureForViewer,
   listReservations,
   unclaimItem,
   updateOwnItem,
   type ItemPatch,
 } from './items';
+import { PICTURE_BODY_LIMIT, parsePicture } from './picture';
 import { MIN_PASSWORD_LENGTH, getPasswordHash, registeredNames, replacePassword, setInitialPassword, verifyPassword } from './password';
 import { fetchPreview as defaultFetchPreview, type Preview } from './scrape';
 import {
@@ -75,7 +77,12 @@ export function createApp({ config, getDb, fetchPreview = defaultFetchPreview }:
     res.setHeader('Cache-Control', 'no-store');
     next();
   });
-  api.use(express.json({ limit: '20kb' }));
+  api.use((req, res, next) => {
+    // Item writes may carry a photo, so they use a larger limit, applied only once the user is authenticated.
+    if (['POST', 'PATCH'].includes(req.method) && /^\/items(\/\d+)?\/?$/.test(req.path)) return next();
+    express.json({ limit: '20kb' })(req, res, next);
+  });
+  const itemJson = express.json({ limit: PICTURE_BODY_LIMIT });
 
   // Cheap CSRF defence on top of SameSite=Lax: browsers always send Origin on cross-site writes.
   api.use((req, _res, next) => {
@@ -239,7 +246,7 @@ export function createApp({ config, getDb, fetchPreview = defaultFetchPreview }:
     res.json({ items: await getListForViewer(await getDb(), me, me) });
   });
 
-  api.post('/items', requireUser, async (req, res) => {
+  api.post('/items', requireUser, itemJson, async (req, res) => {
     const me = (req as AuthedRequest).user;
     const body = req.body ?? {};
     let owner = me;
@@ -248,18 +255,19 @@ export function createApp({ config, getDb, fetchPreview = defaultFetchPreview }:
       if (!owner) throw new HttpError(403, 'Tu ne gères pas la liste de cette personne');
     }
     const item = await addItem(await getDb(), owner, {
-      title: text(body.title, 200, 'Le titre', true)!,
+      title: text(body.title, 200, 'Le titre') ?? '',
       url: webUrl(body.url, 'Le lien'),
       image: webUrl(body.image, "L'image"),
       price: text(body.price, 50, 'Le prix'),
       note: text(body.note, 1000, 'La note'),
       multi: body.multi === true,
       favorite: body.favorite === true,
+      picture: body.picture == null ? null : parsePicture(body.picture),
     });
     res.status(201).json({ item });
   });
 
-  api.patch('/items/:id', requireUser, async (req, res) => {
+  api.patch('/items/:id', requireUser, itemJson, async (req, res) => {
     const user = (req as AuthedRequest).user;
     const body = req.body ?? {};
     const has = (k: string) => body[k] !== undefined;
@@ -268,16 +276,28 @@ export function createApp({ config, getDb, fetchPreview = defaultFetchPreview }:
       return body[k] as boolean;
     };
     const patch: ItemPatch = {};
-    if (has('title')) patch.title = text(body.title, 200, 'Le titre', true)!;
+    if (has('title')) patch.title = text(body.title, 200, 'Le titre') ?? '';
     if (has('url')) patch.url = webUrl(body.url, 'Le lien');
     if (has('image')) patch.image = webUrl(body.image, "L'image");
     if (has('price')) patch.price = text(body.price, 50, 'Le prix');
     if (has('note')) patch.note = text(body.note, 1000, 'La note');
     if (has('multi')) patch.multi = flag('multi');
     if (has('favorite')) patch.favorite = flag('favorite');
+    if (has('picture')) patch.picture = body.picture === null ? null : parsePicture(body.picture);
     const item = await updateOwnItem(await getDb(), [user, ...managedBy(user)], itemId(req), patch);
     if (!item) throw new HttpError(404, 'Cadeau introuvable');
     res.json({ item });
+  });
+
+  // The URL carries a version (?v=) that changes with the picture, so browsers may cache it for good.
+  api.get('/items/:id/picture', requireUser, async (req, res) => {
+    const picture = await getPictureForViewer(await getDb(), (req as AuthedRequest).user, itemId(req));
+    if (!picture) throw new HttpError(404, 'Photo introuvable');
+    res.setHeader('Content-Type', picture.mime);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', "default-src 'none'");
+    res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
+    res.send(picture.data);
   });
 
   api.delete('/items/:id', requireUser, async (req, res) => {
@@ -314,6 +334,8 @@ export function createApp({ config, getDb, fetchPreview = defaultFetchPreview }:
       res.status(err.status).json({ error: err.message });
     } else if ((err as { type?: string })?.type === 'entity.parse.failed') {
       res.status(400).json({ error: 'JSON invalide' });
+    } else if ((err as { type?: string })?.type === 'entity.too.large') {
+      res.status(413).json({ error: 'La requête est trop volumineuse' });
     } else {
       console.error(err);
       res.status(500).json({ error: 'Une erreur est survenue' });
