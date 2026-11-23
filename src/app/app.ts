@@ -3,6 +3,7 @@ import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/rou
 import { AddRequest } from './add-request';
 import { Auth } from './auth';
 import { Avatar } from './components/avatar';
+import { WhatsNew } from './whats-new';
 
 @Component({
   selector: 'app-root',
@@ -15,8 +16,20 @@ import { Avatar } from './components/avatar';
           <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Ma liste</a>
           <a routerLink="/people" routerLinkActive="active">Famille</a>
           <a routerLink="/reservations" routerLinkActive="active">Mes réservations</a>
+          <a routerLink="/news" routerLinkActive="active" class="news-link">
+            ✨ Nouveautés
+            @if (whatsNew.unseen()) {
+              <span class="new-dot" aria-hidden="true"></span><span class="sr-only">(nouveau)</span>
+            }
+          </a>
         </nav>
         <div class="me">
+          <a routerLink="/news" class="news-chip" [attr.aria-label]="whatsNew.unseen() ? 'Nouveautés (nouveau)' : 'Nouveautés'">
+            <span aria-hidden="true">✨</span>
+            @if (whatsNew.unseen()) {
+              <span class="new-dot" aria-hidden="true"></span>
+            }
+          </a>
           <app-avatar [name]="me" [size]="28" />
           <span class="me-name">{{ me }}</span>
           <button class="link logout" type="button" (click)="logout()">
@@ -50,6 +63,7 @@ import { Avatar } from './components/avatar';
 })
 export class App {
   protected auth = inject(Auth);
+  protected whatsNew = inject(WhatsNew);
   private router = inject(Router);
   private addRequest = inject(AddRequest);
 

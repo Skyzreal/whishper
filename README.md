@@ -161,6 +161,23 @@ Amazon surtout, affichent une page de vérification anti-robot au lieu du produi
 - pour Amazon, le nom du produit est déduit de l'adresse du lien quand c'est possible ;
 - un petit message t'invite à vérifier le nom et à ajouter le prix ou une note toi-même. Le lien est quand même enregistré.
 
+## Publier des notes de version
+
+La page **✨ Nouveautés** (dans la nav sur PC, pastille ✨ en haut sur mobile) liste ce qui a changé, de la version la plus récente à la plus ancienne. Une petite pastille rouge signale une version que la personne n'a pas encore vue (mémorisé par appareil dans le `localStorage`, rien côté serveur).
+
+Tout le contenu est dans **un seul fichier** : `src/app/release-notes.ts`. Pour publier une version, ajoute un bloc **en haut** de `RELEASES` :
+
+```ts
+{
+  version: '1.5',          // doit être nouveau : c'est ce qui rallume la pastille chez tout le monde
+  date: '2026-12-01',
+  title: 'Un titre sympa',
+  notes: ['Tu peux maintenant …', 'Autre nouveauté visible par la famille.'],
+},
+```
+
+À mettre à jour **à chaque fois qu'un lot de nouveautés pour la famille est livré**. Seulement ce que la famille voit ou peut faire, avec des phrases simples : pas de correctifs, de refontes ni de détails techniques.
+
 ## Structure du projet
 
 ```
