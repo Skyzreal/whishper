@@ -10,7 +10,7 @@ import { openDb } from './db';
 
 const config: Config = {
   members: ['Stéphanie', 'Michaël', 'Nathaniel', 'Orélie'],
-  managed: { Orélie: 'Michaël' },
+  managed: { Orélie: ['Michaël', 'Nathaniel'] },
   passcode: 'family-secret',
   sessionSecret: 'test-secret-test-secret',
   databaseUrl: '',
@@ -668,6 +668,41 @@ describe('managed lists (a child without an account)', () => {
     expect((await alice.delete(`/api/items/${body.item.id}`)).status).toBe(404);
     expect((await alice.get('/api/people/Or%C3%A9lie/items')).body.canManage).toBe(false);
     expect((await alice.get('/api/people')).body.people.every((p: { canManage: boolean }) => !p.canManage)).toBe(true);
+  });
+
+  it('every manager of a shared list gets the owner view and owner rights, and neither can claim on it', async () => {
+    const bob = as(await login('Michaël'));
+    const nat = as(await login('Nathaniel'));
+    const alice = as(await login('Stéphanie'));
+    const first = (await bob.post('/api/items').send({ title: 'Lego', forName: 'Orélie' })).body.item;
+    const second = (await nat.post('/api/items').send({ title: 'Puzzle', forName: 'orelie' })).body.item;
+    expect(first.owner).toBe('Orélie');
+    expect(second.owner).toBe('Orélie');
+    expect(Object.keys(second).sort()).toEqual(Object.keys(first).sort());
+
+    expect((await alice.post(`/api/items/${first.id}/claim`)).status).toBe(200);
+    for (const manager of [bob, nat]) {
+      const view = await manager.get('/api/people/Or%C3%A9lie/items');
+      expect(view.body.canManage).toBe(true);
+      expect(view.body.items).toHaveLength(2);
+      expect(JSON.stringify(view.body)).not.toMatch(/claim/i);
+      expect((await manager.get('/api/people')).body.people.find((p: { name: string }) => p.name === 'Orélie').canManage).toBe(true);
+      expect((await manager.post(`/api/items/${first.id}/claim`)).status).toBe(403);
+      expect((await manager.post(`/api/items/${second.id}/claim`)).status).toBe(403);
+    }
+    expect((await nat.patch(`/api/items/${first.id}`).send({ title: 'Lego Technic' })).status).toBe(200);
+    expect((await bob.delete(`/api/items/${second.id}`)).status).toBe(200);
+    expect((await nat.delete(`/api/items/${first.id}`)).status).toBe(200);
+    expect((await alice.get('/api/reservations')).body.items[0].removed).toBe(true);
+  });
+
+  it('a manager still claims normally on other lists, and other members cannot manage the shared list', async () => {
+    const nat = as(await login('Nathaniel'));
+    const alice = as(await login('Stéphanie'));
+    const { body } = await alice.post('/api/items').send({ title: 'Livre' });
+    expect((await nat.post(`/api/items/${body.item.id}/claim`)).status).toBe(200);
+    expect((await alice.post('/api/items').send({ title: 'Hack', forName: 'Orélie' })).status).toBe(403);
+    expect((await nat.post('/api/items').send({ title: 'Hack', forName: 'Stéphanie' })).status).toBe(403);
   });
 
   it('the managed person cannot sign in or register, and is not offered on the sign-in page', async () => {

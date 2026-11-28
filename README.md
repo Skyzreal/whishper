@@ -49,8 +49,8 @@ Sur **Ma liste**, chaque idée a un bouton **« Modifier »** (titre, lien, imag
 
 ### Gérer la liste d'un enfant
 
-Avec `MANAGED_MEMBERS=Orélie:François`, Orélie n'a pas de compte : François va sur sa fiche dans **Famille** et peut y **ajouter**, **modifier** et **retirer** des idées à sa place. Le prénom d'Orélie n'apparaît plus sur la page de connexion, et la connexion à son nom est refusée.
-Le parent voit la liste comme le ferait son propriétaire : aucune information sur les réservations, et il ne peut pas réserver sur cette liste. Les autres membres de la famille la voient et réservent normalement. Pour que l'enfant ait son propre compte plus tard, retire simplement son entrée de `MANAGED_MEMBERS`.
+Avec `MANAGED_MEMBERS=Orélie:François+Marie`, Orélie n'a pas de compte : François **et** Marie vont sur sa fiche dans **Famille** et peuvent y **ajouter**, **modifier** et **retirer** des idées à sa place (une seule personne : `Orélie:François`, toujours valable). Plusieurs enfants se séparent par des virgules (`Orélie:François+Marie,Zoé:Jade`). Les idées ajoutées par l'un ou l'autre appartiennent à Orélie, sans trace de qui les a ajoutées. Le prénom d'Orélie n'apparaît plus sur la page de connexion, et la connexion à son nom est refusée.
+Chaque parent voit la liste comme le ferait son propriétaire : aucune information sur les réservations, et il ne peut pas réserver sur cette liste (mais réserve normalement sur celles des autres). Les autres membres de la famille la voient et réservent normalement. Les prénoms doivent être dans `FAMILY_MEMBERS`, et un parent ne peut pas avoir lui-même sa liste gérée. Pour que l'enfant ait son propre compte plus tard, retire simplement son entrée de `MANAGED_MEMBERS`.
 
 ## Technologies
 
@@ -83,7 +83,7 @@ La base de données locale est créée dans `data/whishper.db`.
 | Variable | Requise | Description |
 | --- | --- | --- |
 | `FAMILY_MEMBERS` | oui | Prénoms séparés par des virgules, au moins deux (p. ex. `Stéphanie,Michaël,Jade`). Les accents et les majuscules sont ignorés à la connexion. Renommer quelqu'un rend ses cadeaux existants orphelins. |
-| `MANAGED_MEMBERS` | non | Personnes sans compte (un enfant, par exemple), au format `Enfant:Parent` (p. ex. `Orélie:François`). Les deux doivent être dans `FAMILY_MEMBERS`. Voir « Gérer la liste d'un enfant ». |
+| `MANAGED_MEMBERS` | non | Personnes sans compte (un enfant, par exemple), au format `Enfant:Parent` ou `Enfant:Parent1+Parent2` (p. ex. `Orélie:François+Marie`). Tous doivent être dans `FAMILY_MEMBERS`. Voir « Gérer la liste d'un enfant ». |
 | `FAMILY_PASSCODE` | oui | Code secret de la famille, demandé une seule fois par personne pour créer son mot de passe. Il ne sert plus à se connecter ensuite. |
 | `SESSION_SECRET` | oui | Chaîne aléatoire (16 caractères ou plus) servant à signer les cookies. La changer déconnecte tout le monde. |
 | `TURSO_DATABASE_URL` | production | p. ex. `libsql://your-db-org.turso.io`. Par défaut, le fichier local `file:data/whishper.db`. |

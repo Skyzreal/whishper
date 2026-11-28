@@ -14,6 +14,12 @@ export interface Release {
  */
 export const RELEASES: readonly Release[] = [
   {
+    version: '1.5',
+    date: '2026-11-28',
+    title: 'Deux parents pour une liste',
+    notes: ['Marie peut maintenant, tout comme François, ajouter, modifier et retirer des idées sur la liste d\'Orélie.'],
+  },
+  {
     version: '1.4',
     date: '2026-11-23',
     title: 'Les photos arrivent !',

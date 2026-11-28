@@ -24368,16 +24368,17 @@ function loadConfig(env = process.env) {
   const managed = {};
   const managedProblems = [];
   for (const entry of (env["MANAGED_MEMBERS"] ?? "").split(/[,;]/).map((e) => e.trim()).filter(Boolean)) {
-    const [childRaw, guardianRaw, ...extra] = entry.split(":");
+    const [childRaw, guardiansRaw, ...extra] = entry.split(":");
     const child = findMember(members, childRaw);
-    const guardian = findMember(members, guardianRaw);
-    if (!child || !guardian || extra.length || child === guardian) {
-      managedProblems.push(`MANAGED_MEMBERS : \xAB ${entry} \xBB est invalide (format attendu : Enfant:Parent, les deux dans FAMILY_MEMBERS)`);
+    const guardians = (guardiansRaw ?? "").split("+").map((g) => findMember(members, g));
+    const valid = guardians.filter((g) => !!g);
+    if (!child || extra.length || valid.length !== guardians.length || valid.includes(child) || child in managed) {
+      managedProblems.push(`MANAGED_MEMBERS : \xAB ${entry} \xBB est invalide (format attendu : Enfant:Parent ou Enfant:Parent1+Parent2, tous dans FAMILY_MEMBERS)`);
     } else {
-      managed[child] = guardian;
+      managed[child] = [...new Set(valid)];
     }
   }
-  if (Object.values(managed).some((g) => g in managed)) {
+  if (Object.values(managed).some((gs) => gs.some((g) => g in managed))) {
     managedProblems.push("MANAGED_MEMBERS : une personne qui g\xE8re une liste ne peut pas avoir elle-m\xEAme sa liste g\xE9r\xE9e");
   }
   const passcode = env["FAMILY_PASSCODE"] ?? "";
@@ -25084,10 +25085,10 @@ function createApp({ config, getDb, fetchPreview: fetchPreview2 = fetchPreview }
     res.setHeader("Set-Cookie", `${COOKIE_NAME}=${token}; Max-Age=${SESSION_MAX_AGE_S}; ${cookieAttrs()}`);
     res.json({ name: member });
   };
-  const managedBy = (user) => config.members.filter((m) => config.managed[m] === user);
+  const managedBy = (user) => config.members.filter((m) => config.managed[m]?.includes(user));
   const refuseManaged = (member) => {
-    const guardian = config.managed[member];
-    if (guardian) throw new HttpError(403, `${member} n'a pas de compte : ${guardian} g\xE8re sa liste`);
+    const guardians = config.managed[member];
+    if (guardians) throw new HttpError(403, `${member} n'a pas de compte : ${guardians.join(" et ")} g\xE8re${guardians.length > 1 ? "nt" : ""} sa liste`);
   };
   const secret = (value) => typeof value === "string" ? value : "";
   api.post("/login", async (req, res) => {
@@ -25171,7 +25172,7 @@ function createApp({ config, getDb, fetchPreview: fetchPreview2 = fetchPreview }
       people: config.members.map((name) => ({
         name,
         itemCount: counts.get(name) ?? 0,
-        canManage: config.managed[name] === req.user
+        canManage: !!config.managed[name]?.includes(req.user)
       }))
     });
   });
@@ -25179,7 +25180,7 @@ function createApp({ config, getDb, fetchPreview: fetchPreview2 = fetchPreview }
     const viewer = req.user;
     const owner = findMember(config.members, req.params["name"]);
     if (!owner) throw new HttpError(404, "Personne introuvable");
-    const canManage = config.managed[owner] === viewer;
+    const canManage = !!config.managed[owner]?.includes(viewer);
     const items = await getListForViewer(await getDb(), canManage ? owner : viewer, owner);
     res.json({ owner, isMe: owner === viewer, canManage, items });
   });

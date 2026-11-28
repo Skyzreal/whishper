@@ -121,10 +121,10 @@ export function createApp({ config, getDb, fetchPreview = defaultFetchPreview }:
     res.setHeader('Set-Cookie', `${COOKIE_NAME}=${token}; Max-Age=${SESSION_MAX_AGE_S}; ${cookieAttrs()}`);
     res.json({ name: member });
   };
-  const managedBy = (user: string) => config.members.filter((m) => config.managed[m] === user);
+  const managedBy = (user: string) => config.members.filter((m) => config.managed[m]?.includes(user));
   const refuseManaged = (member: string) => {
-    const guardian = config.managed[member];
-    if (guardian) throw new HttpError(403, `${member} n'a pas de compte : ${guardian} gère sa liste`);
+    const guardians = config.managed[member];
+    if (guardians) throw new HttpError(403, `${member} n'a pas de compte : ${guardians.join(' et ')} gère${guardians.length > 1 ? 'nt' : ''} sa liste`);
   };
   const secret = (value: unknown): string => (typeof value === 'string' ? value : '');
 
@@ -222,7 +222,7 @@ export function createApp({ config, getDb, fetchPreview = defaultFetchPreview }:
       people: config.members.map((name) => ({
         name,
         itemCount: counts.get(name) ?? 0,
-        canManage: config.managed[name] === (req as AuthedRequest).user,
+        canManage: !!config.managed[name]?.includes((req as AuthedRequest).user),
       })),
     });
   });
@@ -231,7 +231,7 @@ export function createApp({ config, getDb, fetchPreview = defaultFetchPreview }:
     const viewer = (req as AuthedRequest).user;
     const owner = findMember(config.members, req.params['name']);
     if (!owner) throw new HttpError(404, 'Personne introuvable');
-    const canManage = config.managed[owner] === viewer;
+    const canManage = !!config.managed[owner]?.includes(viewer);
     // A manager sees the list exactly as its owner would: no claim data.
     const items = await getListForViewer(await getDb(), canManage ? owner : viewer, owner);
     res.json({ owner, isMe: owner === viewer, canManage, items });

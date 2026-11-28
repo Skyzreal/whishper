@@ -29,15 +29,22 @@ describe('config names', () => {
   it('ignores stray semicolons at the end of values', () => {
     const cfg = loadConfig({ ...base, FAMILY_MEMBERS: 'Marie,Orélie,François;', MANAGED_MEMBERS: 'Orélie:François;' });
     expect(cfg.members).toEqual(['Marie', 'Orélie', 'François']);
-    expect(cfg.managed).toEqual({ Orélie: 'François' });
+    expect(cfg.managed).toEqual({ Orélie: ['François'] });
   });
 
   it('parses MANAGED_MEMBERS and rejects bad entries', () => {
     const FAMILY_MEMBERS = 'Marie,François,Orélie';
-    expect(loadConfig({ ...base, FAMILY_MEMBERS, MANAGED_MEMBERS: 'orelie:Francois' }).managed).toEqual({ Orélie: 'François' });
+    expect(loadConfig({ ...base, FAMILY_MEMBERS, MANAGED_MEMBERS: 'orelie:Francois' }).managed).toEqual({ Orélie: ['François'] });
+    expect(loadConfig({ ...base, FAMILY_MEMBERS, MANAGED_MEMBERS: 'Orélie:François+marie' }).managed).toEqual({ Orélie: ['François', 'Marie'] });
+    expect(loadConfig({ ...base, FAMILY_MEMBERS, MANAGED_MEMBERS: 'Orélie:François+François' }).managed).toEqual({ Orélie: ['François'] });
     expect(loadConfig({ ...base, FAMILY_MEMBERS }).managed).toEqual({});
+    expect(() => loadConfig({ ...base, FAMILY_MEMBERS, MANAGED_MEMBERS: 'Orélie:François+Zoé' })).toThrow(/MANAGED_MEMBERS/);
+    expect(() => loadConfig({ ...base, FAMILY_MEMBERS, MANAGED_MEMBERS: 'Orélie:François+' })).toThrow(/MANAGED_MEMBERS/);
+    expect(() => loadConfig({ ...base, FAMILY_MEMBERS, MANAGED_MEMBERS: 'Orélie:Orélie+Marie' })).toThrow(/MANAGED_MEMBERS/);
+    expect(() => loadConfig({ ...base, FAMILY_MEMBERS, MANAGED_MEMBERS: 'Orélie:François,Orélie:Marie' })).toThrow(/MANAGED_MEMBERS/);
     expect(() => loadConfig({ ...base, FAMILY_MEMBERS, MANAGED_MEMBERS: 'Zoé:François' })).toThrow(/MANAGED_MEMBERS/);
     expect(() => loadConfig({ ...base, FAMILY_MEMBERS, MANAGED_MEMBERS: 'Orélie:Orélie' })).toThrow(/MANAGED_MEMBERS/);
+    expect(() => loadConfig({ ...base, FAMILY_MEMBERS, MANAGED_MEMBERS: 'Orélie:François+Marie,François:Marie' })).toThrow(/gérée/);
     expect(() => loadConfig({ ...base, FAMILY_MEMBERS, MANAGED_MEMBERS: 'Orélie:François,François:Marie' })).toThrow(/gérée/);
   });
 });
